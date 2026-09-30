@@ -6,13 +6,10 @@ import { Icon } from "@/components/Icon";
 import { Avatars } from "@/components/ui";
 import { useApp } from "@/components/AppProvider";
 import { uploadAvatar } from "@/lib/photos";
+import { FrejasLockup } from "@/components/Logo";
 
 type Step = "start" | "email" | "code" | "name";
 interface Invite { name: string; starts_on: string; ends_on: string; stake: string | null; member_names: string[] }
-
-function Logo() {
-  return <img src="/icon-192.png" alt="" width={84} height={84} style={{ display: "block", borderRadius: 22 }} />;
-}
 
 function Welcome() {
   const router = useRouter();
@@ -101,17 +98,19 @@ function Welcome() {
   if (step === "start") return wrap(
     <>
       {inv ? (
-        <div className="soft" style={{ marginTop: 40, padding: 20, borderRadius: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center" }}>
+        <>
+        <div style={{ marginTop: 30, display: "flex", justifyContent: "center" }}><FrejasLockup mark={64} word={22} /></div>
+        <div className="soft" style={{ marginTop: 10, padding: 20, borderRadius: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center" }}>
           <Avatars people={inv.member_names.map((n) => ({ name: n }))} size={44} ring="var(--soft)" />
           <div className="muted" style={{ fontSize: 14 }}><b style={{ color: "var(--ink)" }}>{inv.member_names[0]}</b> invited you to</div>
           <div className="h1">{inv.name}</div>
           {inv.stake && <span className="tag tag-accent" style={{ display: "flex", gap: 4, alignItems: "center" }}><Icon name="coffee" size={14} color="var(--accent)" />{inv.stake}</span>}
           <div className="muted" style={{ fontSize: 14.5, marginTop: 6 }}>Create a free account to join. It takes less than a minute.</div>
         </div>
+        </>
       ) : (
-        <div style={{ marginTop: 90, display: "flex", flexDirection: "column", alignItems: "center", gap: 20, textAlign: "center" }}>
-          <Logo />
-          <div className="font-display" style={{ fontSize: 20, fontWeight: 600, color: "var(--primary)" }}>Frejas</div>
+        <div style={{ marginTop: 70, display: "flex", flexDirection: "column", alignItems: "center", gap: 26, textAlign: "center" }}>
+          <FrejasLockup mark={112} word={34} />
           <h1 className="h1" style={{ fontSize: 36 }}>Small habits,<br />better together.</h1>
           <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, maxWidth: 280, margin: 0 }}>Keep your own routines and start friendly challenges with friends.</p>
         </div>

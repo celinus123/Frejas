@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Cover } from "@/components/Cover";
+import { FrejasMark, FrejasWordmark } from "@/components/Logo";
 import { Icon } from "@/components/Icon";
 import { Avatars } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
@@ -106,6 +107,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
 
   return (
     <main className="page" style={{ minHeight: "100dvh", paddingBottom: 30, gap: 14 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, paddingTop: 4 }}><FrejasMark size={36} /><FrejasWordmark height={20} /></div>
       <div style={{ margin: "0 -20px" }}><Cover preset={inv.cover_preset} height={150} /></div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <Avatars people={inv.member_names.map((n) => ({ name: n }))} size={36} ring="var(--bg)" />
