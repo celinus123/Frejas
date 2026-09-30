@@ -223,6 +223,7 @@ function ChallengePage({ id }: { id: string }) {
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{isV2(c) ? `${mine.done} of ${mine.target} sessions` : group ? `You're ${ordinal(myIdx + 1)}` : `${mine.done} days`}</span>
           {mine.finished && <span className="tag tag-accent" style={{ fontWeight: 800 }}>Made it</span>}
+          {weeks.some((w) => w.extra > 0) && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{weeks.reduce((x, w) => x + w.extra, 0)} bonus</span>}
         </div>
         {group && isV2(c) && c.win_rule !== "finishers" && <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re {ordinal(myIdx + 1)} of {st.length} · {mine.display}</div>}
         {!group && isV2(c) && !finished && <div className="muted" style={{ fontSize: 12.5 }}>{mine.consistency >= 80 ? "On track" : "A few sessions behind — you've got this"}</div>}
@@ -237,6 +238,7 @@ function ChallengePage({ id }: { id: string }) {
         <button className="icon-btn" aria-label="Previous week" disabled={wi <= 0} onClick={() => setWeekIdx(wi - 1)} style={{ width: 30, height: 30, boxShadow: "none", background: "none", opacity: wi <= 0 ? 0.25 : 1 }}><Icon name="left" size={16} /></button>
         <span style={{ flex: 1, fontSize: 15, fontWeight: 800 }}>{thisWeek.isCurrent ? "This week" : `${formatShort(thisWeek.from)} – ${formatShort(thisWeek.to)}`}</span>
         <span style={{ fontSize: 13, fontWeight: 800 }}>{thisWeek.done} of {thisWeek.target}</span>
+        {thisWeek.extra > 0 && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{thisWeek.extra} bonus</span>}
         <button className="icon-btn" aria-label="Next week" disabled={thisWeek.isCurrent || !weeks[wi + 1] || weeks[wi + 1].isFuture} onClick={() => setWeekIdx(wi + 1)}
           style={{ width: 30, height: 30, boxShadow: "none", background: "none", opacity: thisWeek.isCurrent || !weeks[wi + 1] || weeks[wi + 1].isFuture ? 0.25 : 1 }}><Icon name="right" size={16} /></button>
       </div>

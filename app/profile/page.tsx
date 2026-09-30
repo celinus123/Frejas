@@ -51,6 +51,11 @@ export default function Profile() {
       <section className="card" style={{ display: "flex", padding: "14px 8px" }}>
         {stat(habitCount, "habits")}{stat(<><Flame size={18} />{streak}</>, "day streak")}{stat(people.length, "friends")}
       </section>
+      <Link href="/archive" className="card row" style={{ color: "inherit", textDecoration: "none" }}>
+        <Icon name="archive" color="var(--primary)" />
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Archived habits</span>
+        <Icon name="right" size={16} color="var(--ink-2)" />
+      </Link>
       <div className="label">People you challenge with</div>
       {people.length ? (
         <section className="card group">

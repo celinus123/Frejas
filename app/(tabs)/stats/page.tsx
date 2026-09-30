@@ -5,7 +5,7 @@ import { Flame, Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Sheet } from "@/components/ui";
 import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
-import { addDays, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
+import { addDays, bonusSessions, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
 import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
 
@@ -97,6 +97,7 @@ export default function Stats() {
           {stat(tile("var(--accent-bg)", <Flame size={20} />), streak, "day streak")}
           {stat(tile("var(--soft)", <Icon name="check" color="var(--primary)" stroke={2.2} />), count, "check-ins")}
           {stat(tile("var(--soft)", <Icon name="stats" color="var(--primary)" />), period === "Week" ? (count / Math.max(1, past.length)).toFixed(1) : (count / weeks).toFixed(1), period === "Week" ? "per day" : "per week")}
+          {habits.some(isFlexible) && stat(tile("var(--accent-bg)", <Icon name="plus" color="var(--accent)" stroke={2.4} />), bonusSessions(habits, logs, from, to), "bonus sessions")}
         </div>
       </section>
 
@@ -176,6 +177,7 @@ export default function Stats() {
               return (
                 <div key={h.id} className="row">
                   <div style={{ flex: 1 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{h.name}</div><div className="muted" style={{ fontSize: 12 }}>{frequencyLabel(h)} · {p.label.toLowerCase()}</div></div>
+                  {c > p.target && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{c - p.target} bonus</span>}
                   <Ring size={40} stroke={4} pct={(Math.min(c, p.target) / p.target) * 100}><span style={{ fontSize: 11, fontWeight: 800 }}>{Math.min(c, p.target)}/{p.target}</span></Ring>
                 </div>
               );

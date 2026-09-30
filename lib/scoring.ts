@@ -96,7 +96,7 @@ export function qualifyingDays(c: Challenge, m: Member | null | undefined, mine:
   return out;
 }
 
-export interface WeekResult extends Week { done: number; isCurrent: boolean; isPast: boolean; isFuture: boolean }
+export interface WeekResult extends Week { done: number; extra: number; isCurrent: boolean; isPast: boolean; isFuture: boolean }
 
 export function weekResults(c: Challenge, m: Member | null | undefined, mine: CheckIn[]): WeekResult[] {
   const days = qualifyingDays(c, m, mine);
@@ -104,7 +104,7 @@ export function weekResults(c: Challenge, m: Member | null | undefined, mine: Ch
   return planWeeks(c, m).map((w) => {
     let n = 0;
     for (let d = w.from; d <= w.to; d = addDays(d, 1)) if (days.has(d)) n++;
-    return { ...w, done: Math.min(n, w.target), isCurrent: w.from <= t && t <= w.to, isPast: w.to < t, isFuture: w.from > t };
+    return { ...w, done: Math.min(n, w.target), extra: Math.max(0, n - w.target), isCurrent: w.from <= t && t <= w.to, isPast: w.to < t, isFuture: w.from > t };
   });
 }
 

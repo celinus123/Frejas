@@ -129,3 +129,21 @@ export function dayFraction(habits: Habit[], done: Set<string>, date: string): n
   if (!sched.length) return null;
   return sched.filter((h) => done.has(`${h.id}|${date}`)).length / sched.length;
 }
+
+/** Extra sessions beyond the goal of flexible habits ("3× a week" done 4 times = 1 bonus), for periods starting in [from, to]. */
+export function bonusSessions(habits: Habit[], logs: { habit_id: string; log_date: string }[], from: string, to: string): number {
+  let bonus = 0;
+  for (const h of habits) {
+    if (!isFlexible(h)) continue;
+    const counts = new Map<string, { n: number; target: number }>();
+    for (const l of logs) {
+      if (l.habit_id !== h.id) continue;
+      const p = flexPeriod(h, l.log_date);
+      if (p.from < from || p.from > to) continue;
+      const c = counts.get(p.from) ?? { n: 0, target: p.target };
+      c.n++; counts.set(p.from, c);
+    }
+    for (const c of counts.values()) bonus += Math.max(0, c.n - c.target);
+  }
+  return bonus;
+}

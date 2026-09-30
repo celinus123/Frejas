@@ -90,7 +90,7 @@ export default function Today() {
       ? await supabase().from("habits").update({ archived_at: new Date().toISOString() }).eq("id", h.id)
       : await supabase().from("habits").delete().eq("id", h.id);
     if (error) { toast({ text: error.message }); return; }
-    toast({ text: archive ? <><b>{h.name}</b> archived. Its history is kept.</> : <><b>{h.name}</b> deleted.</> });
+    toast({ text: archive ? <><b>{h.name}</b> archived. Find it under Profile → Archived habits.</> : <><b>{h.name}</b> deleted.</> });
     load();
   }
 
@@ -231,11 +231,12 @@ export default function Today() {
                   <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
                     <Link href={`/habits/${h.id}`} style={{ flex: 1, color: "inherit", textDecoration: "none" }}>
                       <div style={{ fontSize: 15, fontWeight: 700 }}>{h.name}</div>
-                      <div className="muted" style={{ fontSize: 12.5 }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}</div>
+                      <div className="muted" style={{ fontSize: 12.5 }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}
+                        {count > p.target && <span className="tag tag-accent" style={{ marginLeft: 6, fontWeight: 800, color: "var(--ink)" }}>+{count - p.target} bonus</span>}</div>
                     </Link>
                     <Ring size={34} stroke={4} pct={(Math.min(count, p.target) / p.target) * 100} />
                     <button className="check" aria-pressed={todayDone} aria-label={todayDone ? `Undo ${h.name} for ${dayTitle}` : `Log ${h.name} for ${dayTitle}`} onClick={() => toggle(h)}
-                      style={!todayDone ? { color: "var(--primary)" } : undefined} disabled={reached && !todayDone}>
+                      style={!todayDone ? { color: "var(--primary)" } : undefined}>
                       <Icon name={todayDone ? "check" : "plus"} stroke={2.3} size={todayDone ? 20 : 18} />
                     </button>
                   </div>
@@ -291,7 +292,7 @@ export default function Today() {
             <div className="h1" style={{ fontSize: 24 }}>Delete {delHabit.name}?</div>
             <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
               Deleting removes the habit and all its ticks for good. Check-ins you&apos;ve posted in challenges stay.
-              Archiving hides it but keeps your history, and you can bring it back later.
+              Archiving hides it but keeps your history. You can bring it back from Profile → Archived habits.
             </p>
             <button className="btn btn-primary" onClick={() => deleteHabit(delHabit, false)}><Icon name="trash" />Delete for good</button>
             <button className="btn btn-soft" onClick={() => deleteHabit(delHabit, true)}><Icon name="archive" />Archive instead</button>
