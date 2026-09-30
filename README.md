@@ -1,4 +1,4 @@
-# Orbit
+# Frejas
 
 Small habits, better together. A habit tracker where habits can become friendly challenges.
 
@@ -32,7 +32,7 @@ In the Supabase dashboard → **SQL Editor** → **New query**, run these files 
 
 **Authentication → Emails → Magic Link** template, so it sends a code instead of a link:
 
-- Subject: `Your Orbit code: {{ .Token }}`
+- Subject: `Your Frejas code: {{ .Token }}`
 - Body: `<p>Your sign-in code is <strong>{{ .Token }}</strong>. It expires in 10 minutes.</p>`
 
 Before inviting friends, add your own email sender under **Authentication → Emails → SMTP Settings** (for example Resend). The built-in sender is only for testing.

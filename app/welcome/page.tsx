@@ -101,7 +101,7 @@ function Welcome() {
       ) : (
         <div style={{ marginTop: 90, display: "flex", flexDirection: "column", alignItems: "center", gap: 20, textAlign: "center" }}>
           <Logo />
-          <div className="font-display" style={{ fontSize: 20, fontWeight: 600, color: "var(--primary)" }}>Orbit</div>
+          <div className="font-display" style={{ fontSize: 20, fontWeight: 600, color: "var(--primary)" }}>Frejas</div>
           <h1 className="h1" style={{ fontSize: 36 }}>Small habits,<br />better together.</h1>
           <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, maxWidth: 280, margin: 0 }}>Keep your own routines and start friendly challenges with friends.</p>
         </div>

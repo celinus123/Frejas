@@ -40,7 +40,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
       <div className="card" style={{ padding: 24, textAlign: "center", display: "flex", flexDirection: "column", gap: 10 }}>
         <div className="h1" style={{ fontSize: 24 }}>This link doesn't work</div>
         <p className="muted" style={{ margin: 0 }}>The challenge may have ended, or the link was replaced. Ask your friend for a new one.</p>
-        <Link href="/" className="btn btn-soft">Go to Orbit</Link>
+        <Link href="/" className="btn btn-soft">Go to Frejas</Link>
       </div>
     </main>
   );

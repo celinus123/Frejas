@@ -39,7 +39,7 @@ export default function Settings() {
     ]);
     const blob = new Blob([JSON.stringify({ exported_at: new Date().toISOString(), email, profile: p.data, habits: h.data, habit_logs: l.data, challenges_joined: m.data, check_ins: c.data }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "orbit-my-data.json"; a.click();
+    a.href = URL.createObjectURL(blob); a.download = "frejas-my-data.json"; a.click();
     URL.revokeObjectURL(a.href);
   }
 
@@ -110,7 +110,7 @@ export default function Settings() {
           <button className="btn" style={{ background: "var(--ink)", color: "var(--bg)" }} disabled={busy || typed.trim().toLowerCase() !== email.toLowerCase()} onClick={deleteAccount}>{busy ? "Deleting…" : "Delete my account"}</button>
         </section>
       )}
-      <div className="muted" style={{ textAlign: "center", fontSize: 12, marginTop: 10 }}>Orbit · version 0.1</div>
+      <div className="muted" style={{ textAlign: "center", fontSize: 12, marginTop: 10 }}>Frejas · version 0.1</div>
     </main>
   );
 }

@@ -6,9 +6,9 @@ import "./globals.css";
 
 
 export const metadata: Metadata = {
-  title: "Orbit",
+  title: "Frejas",
   description: "Small habits, better together.",
-  appleWebApp: { capable: true, title: "Orbit", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "Frejas", statusBarStyle: "default" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
 };
 
