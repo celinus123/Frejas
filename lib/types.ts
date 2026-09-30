@@ -21,6 +21,7 @@ export interface Habit {
   reminder_time: string | null;
   visibility: "private" | "friends";
   archived_at: string | null;
+  starts_on: string | null;
   created_at: string;
 }
 
@@ -46,6 +47,28 @@ export interface Challenge {
   show_most_photos: boolean;
   invite_token: string;
   invite_revoked: boolean;
+  status: "draft" | "active";
+  solo: boolean;
+  frequency: "daily" | "specific_days" | "times_per_week" | null; // null = created before v2
+  days: number[] | null;
+  times_per_week: number | null;
+  min_amount: number | null;
+  same_goal: boolean;
+  win_rule: "finishers" | "consistent" | "most";
+  finish_pct: number;
+  join_mode: "open" | "approve";
+  cover_preset: CoverPreset | null;
+  cover_path: string | null;
+}
+
+export type CoverPreset = "arches" | "waves" | "sun" | "dots" | "leaf" | "stripes";
+
+export interface Message {
+  id: string;
+  challenge_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
 }
 
 export interface Member {
@@ -53,6 +76,7 @@ export interface Member {
   user_id: string;
   habit_id: string | null;
   goal_amount: number | null;
+  times_per_week: number | null;
   muted: boolean;
   joined_at: string;
   profiles?: { display_name: string; avatar_path: string | null } | null;

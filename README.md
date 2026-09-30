@@ -25,6 +25,7 @@ In the Supabase dashboard → **SQL Editor** → **New query**, run these files 
 
 1. `supabase/schema.sql`
 2. `supabase/002_account_deletion.sql`
+3. `supabase/003_challenges_v2.sql` (solo challenges, schedules, drafts, covers, invites, join requests, chat)
 
 ### 2. Sign-in email
 

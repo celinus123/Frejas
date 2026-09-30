@@ -71,9 +71,12 @@ export function isFlexible(h: Habit): boolean {
   return h.frequency === "times_per_week" || h.frequency === "every_other_week" || h.frequency === "monthly";
 }
 
+/** First day a habit is active (a future challenge's habit waits until it starts). */
+export const habitStart = (h: Habit) => (h.starts_on && h.starts_on > h.created_at.slice(0, 10) ? h.starts_on : h.created_at.slice(0, 10));
+
 export function isScheduledOn(h: Habit, date: string): boolean {
   if (isFlexible(h)) return false;
-  if (date < h.created_at.slice(0, 10)) return false;
+  if (date < habitStart(h)) return false;
   if (h.frequency === "daily") return true;
   return (h.days ?? []).includes(weekday(date));
 }
@@ -107,12 +110,17 @@ export function flexPeriod(h: Habit, date: string): { from: string; to: string; 
   }
   const wk = startOfWeek(date);
   if (h.frequency === "every_other_week") {
-    const base = startOfWeek(h.created_at.slice(0, 10));
+    const base = startOfWeek(habitStart(h));
     const weeks = Math.floor(diffDays(wk, base) / 7);
     const from = weeks % 2 === 0 ? wk : addDays(wk, -7);
     return { from, to: addDays(from, 13), target: 1, label: "These two weeks" };
   }
-  return { from: wk, to: addDays(wk, 6), target: h.times_per_week ?? 1, label: "This week" };
+  // the first week of a habit that starts mid-week only asks for what fits
+  const start = habitStart(h);
+  const from = start > wk ? start : wk;
+  const to = addDays(wk, 6);
+  const span = Math.max(1, diffDays(to, from) + 1);
+  return { from, to, target: Math.min(h.times_per_week ?? 1, span), label: "This week" };
 }
 
 /** Share of scheduled (non-flexible) habits done on a date. null = nothing scheduled. */

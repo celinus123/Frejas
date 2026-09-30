@@ -18,9 +18,10 @@ interface Props {
   habitName?: string;
   habitLogId?: string | null;      // when opened right after ticking the habit on Today
   existing?: CheckIn | null;       // edit mode
+  minAmount?: number | null;       // a check-in only counts at or above this
 }
 
-export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitId, habitName, habitLogId, existing }: Props) {
+export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitId, habitName, habitLogId, existing, minAmount }: Props) {
   const t = today();
   const maxDate = t < challenge.ends_on ? t : challenge.ends_on;
   const [date, setDate] = useState(existing?.checkin_date ?? maxDate);
@@ -49,6 +50,7 @@ export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitI
   const whenMode = date === t ? "today" : date === yesterday ? "yesterday" : "pick";
   const amountNum = amount ? Number(amount.replace(",", ".")) : null;
   const needsAmount = !!challenge.unit;
+  const unitLabel = challenge.unit === "min" ? "minutes" : challenge.unit;
   const valid = title.trim().length > 0 && (!needsAmount || (amountNum !== null && amountNum > 0 && isFinite(amountNum)));
 
   async function save() {
@@ -102,13 +104,18 @@ export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitI
 
       {needsAmount && (
         <>
-          <div className="label">{challenge.unit === "km" ? "Distance" : "Amount"}</div>
+          <div className="label">{challenge.unit === "km" ? "Distance" : challenge.unit === "min" ? "Time" : "Amount"}</div>
           <div className="field" style={{ justifyContent: "center" }}>
-            <input inputMode="decimal" aria-label={`Amount in ${challenge.unit}`} placeholder="0" value={amount}
+            <input inputMode="decimal" aria-label={`Amount in ${unitLabel}`} placeholder="0" value={amount}
               onChange={(e) => setAmount(e.target.value.replace(/[^0-9.,]/g, ""))}
               style={{ fontSize: 32, textAlign: "right", width: 140 }} className="font-display" />
-            <span className="muted" style={{ fontSize: 16, fontWeight: 700 }}>{challenge.unit}</span>
+            <span className="muted" style={{ fontSize: 16, fontWeight: 700 }}>{unitLabel}</span>
           </div>
+          {!!minAmount && (
+            <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", marginTop: -4 }}>
+              Counts if {minAmount} {unitLabel} or more that day{amountNum !== null && amountNum > 0 && amountNum < minAmount ? " — you can still log it, and it adds up with other check-ins that day" : ""}.
+            </div>
+          )}
         </>
       )}
 

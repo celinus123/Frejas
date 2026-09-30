@@ -60,7 +60,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .muted { color: var(--ink-2); }
 .h1 { font-family: var(--font-display), Georgia, serif; font-size: 28px; font-weight: 600; letter-spacing: -0.3px; line-height: 1.15; margin: 0; }
 .h2 { font-size: 17px; font-weight: 800; margin: 0; }
-.label { font-size: 13px; font-weight: 800; color: var(--ink-2); padding: 0 4px; }
+/* Section labels get extra air above them so blocks read as separate groups. */
+.label { font-size: 13px; font-weight: 800; color: var(--ink-2); padding: 0 4px; margin-top: 14px; }
 
 .btn { height: 52px; padding: 0 22px; border-radius: 26px; font-size: 15px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; transition: transform .1s, opacity .15s; }
 .btn:active { transform: scale(0.98); }

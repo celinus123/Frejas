@@ -36,8 +36,16 @@ export async function uploadAvatar(file: File, userId: string): Promise<string> 
   return path;
 }
 
+export async function uploadCover(file: File, challengeId: string): Promise<string> {
+  const blob = await compressImage(file, 1600, 0.85);
+  const path = `${challengeId}/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase().storage.from("covers").upload(path, blob, { contentType: "image/jpeg" });
+  if (error) throw error;
+  return path;
+}
+
 /** Private buckets: fetch short-lived links (1 hour). */
-export async function signedUrls(bucket: "photos" | "avatars", paths: (string | null | undefined)[]): Promise<Record<string, string>> {
+export async function signedUrls(bucket: "photos" | "avatars" | "covers", paths: (string | null | undefined)[]): Promise<Record<string, string>> {
   const unique = [...new Set(paths.filter((p): p is string => !!p))];
   if (!unique.length) return {};
   const { data } = await supabase().storage.from(bucket).createSignedUrls(unique, 3600);

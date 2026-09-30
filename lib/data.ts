@@ -48,7 +48,51 @@ export async function myChallenges(uid: string): Promise<MyChallenge[]> {
     .sort((a, b) => a.challenge.ends_on.localeCompare(b.challenge.ends_on));
 }
 
-export const isActive = (c: Challenge) => c.starts_on <= today() && c.ends_on >= today();
+export const isActive = (c: Challenge) => c.status !== "draft" && c.starts_on <= today() && c.ends_on >= today();
+
+/** Drafts are only the creator's; they have no members yet. */
+export async function myDrafts(uid: string): Promise<Challenge[]> {
+  const { data } = await sb().from("challenges").select("*").eq("creator_id", uid).eq("status", "draft").order("created_at", { ascending: false });
+  return (data ?? []) as Challenge[];
+}
+
+export interface Invitation { challenge: Challenge; from: { display_name: string; avatar_path: string | null } | null }
+
+export async function myInvitations(uid: string): Promise<Invitation[]> {
+  const { data } = await sb().from("challenge_invites").select("challenge_id, invited_by, challenges(*)").eq("user_id", uid);
+  const rows = (data ?? []) as unknown as { challenge_id: string; invited_by: string; challenges: Challenge | null }[];
+  const ids = [...new Set(rows.map((r) => r.invited_by))];
+  const { data: ps } = ids.length ? await sb().from("profiles").select("id, display_name, avatar_path").in("id", ids) : { data: [] };
+  const byId = new Map((ps ?? []).map((p: { id: string; display_name: string; avatar_path: string | null }) => [p.id, p]));
+  return rows.filter((r) => r.challenges).map((r) => ({ challenge: r.challenges!, from: byId.get(r.invited_by) ?? null }));
+}
+
+/** People you have done a challenge with — the friends list. */
+export async function myFriends(uid: string): Promise<{ id: string; display_name: string; avatar_path: string | null; shared: number }[]> {
+  const mine = await myChallenges(uid);
+  const ids = mine.map((m) => m.challenge.id);
+  if (!ids.length) return [];
+  const { data } = await sb().from("challenge_members").select("user_id, profiles(display_name, avatar_path)").in("challenge_id", ids).neq("user_id", uid);
+  const map = new Map<string, { id: string; display_name: string; avatar_path: string | null; shared: number }>();
+  for (const r of (data ?? []) as unknown as { user_id: string; profiles: { display_name: string; avatar_path: string | null } | null }[]) {
+    const p = map.get(r.user_id) ?? { id: r.user_id, display_name: r.profiles?.display_name ?? "", avatar_path: r.profiles?.avatar_path ?? null, shared: 0 };
+    p.shared++; map.set(r.user_id, p);
+  }
+  return [...map.values()].sort((a, b) => b.shared - a.shared);
+}
+
+/** Makes sure a member has a habit on Today for this challenge (e.g. after being approved). */
+export async function ensureHabit(c: Challenge, m: Member, uid: string): Promise<string | null> {
+  if (m.habit_id || !c.frequency) return m.habit_id;
+  const times = c.same_goal ? c.times_per_week : m.times_per_week ?? c.times_per_week;
+  const { data, error } = await sb().from("habits").insert({
+    owner_id: uid, name: c.name.slice(0, 60), frequency: c.frequency, days: c.frequency === "specific_days" ? c.days : null,
+    times_per_week: c.frequency === "times_per_week" ? times : null, starts_on: c.starts_on,
+  }).select("id").single();
+  if (error || !data) return null;
+  await sb().from("challenge_members").update({ habit_id: data.id }).eq("challenge_id", c.id).eq("user_id", uid);
+  return data.id as string;
+}
 
 export async function loadChallenge(id: string) {
   const [c, m, ci] = await Promise.all([

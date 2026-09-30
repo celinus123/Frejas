@@ -4,7 +4,7 @@ import { useApp } from "@/components/AppProvider";
 import { Flame, Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Sheet } from "@/components/ui";
-import { addDays, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
+import { addDays, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
 import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
 
@@ -66,7 +66,7 @@ export default function Stats() {
   const stat = (icon: React.ReactNode, v: React.ReactNode, l: string) => (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>{icon}<div><div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>{v}</div><div className="muted" style={{ fontSize: 12 }}>{l}</div></div></div>
   );
-  const flexible = habits.filter(isFlexible);
+  const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= t);
   const scheduledHabits = habits.filter((h) => !isFlexible(h));
   const weekDays = period === "Week" ? range(from, to) : [];
 

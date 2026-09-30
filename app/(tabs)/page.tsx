@@ -7,7 +7,7 @@ import { DayCircle, Ring } from "@/components/Ring";
 import { Avatar, Avatars, Empty } from "@/components/ui";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { supabase } from "@/lib/supabase";
-import { addDays, dayFraction, flexPeriod, formatLong, frequencyLabel, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
+import { addDays, dayFraction, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
 import { isActive, loadChallenge, loadHabits, loadLogs, logHabit, myChallenges, unlogHabit, type MyChallenge } from "@/lib/data";
 import { daysLeft, fmt, ordinal, sharedTotal, standings } from "@/lib/scoring";
 import type { Habit, HabitLog } from "@/lib/types";
@@ -51,7 +51,7 @@ export default function Today() {
   if (!habits || !profile) return <main className="page"><div className="skeleton" style={{ height: 60 }} /><div className="skeleton" style={{ height: 120 }} /><div className="skeleton" style={{ height: 300 }} /></main>;
 
   const scheduled = habits.filter((h) => isScheduledOn(h, t));
-  const flexible = habits.filter(isFlexible);
+  const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= t);
   const doneToday = scheduled.filter((h) => done.has(`${h.id}|${t}`)).length;
   const pct = scheduled.length ? Math.round((doneToday / scheduled.length) * 100) : 0;
   const week = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(t), i));
