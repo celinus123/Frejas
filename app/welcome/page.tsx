@@ -56,7 +56,8 @@ function Welcome() {
 
   async function sendCode() {
     setBusy(true); setErr(null);
-    const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true } });
+    const back = `${window.location.origin}/welcome${invite ? `?invite=${invite}` : ""}`;
+    const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: back } });
     setBusy(false);
     if (error) return setErr(error.message);
     setStep("code"); setCode(""); setResendIn(45);
@@ -134,7 +135,7 @@ function Welcome() {
     <>
       <button className="icon-btn" aria-label="Back" onClick={() => setStep("email")}><Icon name="left" /></button>
       <h1 className="h1" style={{ fontSize: 30, marginTop: 12 }}>Check your inbox</h1>
-      <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, margin: 0 }}>Enter the code we sent to <b style={{ color: "var(--ink)" }}>{email}</b></p>
+      <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, margin: 0 }}>We sent an email to <b style={{ color: "var(--ink)" }}>{email}</b>. Tap the link in it, or enter the 6-digit code.</p>
       <label className="field" style={{ justifyContent: "center" }}>
         <input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} aria-label="6-digit code" value={code}
           className="font-display" style={{ fontSize: 30, letterSpacing: 14, textAlign: "center" }} placeholder="······"
