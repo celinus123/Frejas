@@ -67,19 +67,38 @@ export async function myInvitations(uid: string): Promise<Invitation[]> {
   return rows.filter((r) => r.challenges).map((r) => ({ challenge: r.challenges!, from: byId.get(r.invited_by) ?? null }));
 }
 
-/** People you have done a challenge with — the friends list. */
-export async function myFriends(uid: string): Promise<{ id: string; display_name: string; avatar_path: string | null; shared: number }[]> {
+export interface Friend { id: string; display_name: string; avatar_path: string | null; shared: number; added: boolean }
+
+/** Friends = people you share a challenge with, plus people you've added with a friend link. */
+export async function myFriends(uid: string): Promise<Friend[]> {
+  const map = new Map<string, Friend>();
   const mine = await myChallenges(uid);
   const ids = mine.map((m) => m.challenge.id);
-  if (!ids.length) return [];
-  const { data } = await sb().from("challenge_members").select("user_id, profiles(display_name, avatar_path)").in("challenge_id", ids).neq("user_id", uid);
-  const map = new Map<string, { id: string; display_name: string; avatar_path: string | null; shared: number }>();
-  for (const r of (data ?? []) as unknown as { user_id: string; profiles: { display_name: string; avatar_path: string | null } | null }[]) {
-    const p = map.get(r.user_id) ?? { id: r.user_id, display_name: r.profiles?.display_name ?? "", avatar_path: r.profiles?.avatar_path ?? null, shared: 0 };
+  const [co, fr] = await Promise.all([
+    ids.length ? sb().from("challenge_members").select("user_id, profiles(display_name, avatar_path)").in("challenge_id", ids).neq("user_id", uid) : Promise.resolve({ data: [] }),
+    sb().from("friendships").select("user_a, user_b"),
+  ]);
+  for (const r of (co.data ?? []) as unknown as { user_id: string; profiles: { display_name: string; avatar_path: string | null } | null }[]) {
+    const p = map.get(r.user_id) ?? { id: r.user_id, display_name: r.profiles?.display_name ?? "", avatar_path: r.profiles?.avatar_path ?? null, shared: 0, added: false };
     p.shared++; map.set(r.user_id, p);
   }
-  return [...map.values()].sort((a, b) => b.shared - a.shared);
+  const addedIds = ((fr.data ?? []) as { user_a: string; user_b: string }[]).map((f) => (f.user_a === uid ? f.user_b : f.user_a));
+  const missing = addedIds.filter((id) => !map.has(id));
+  if (missing.length) {
+    const { data } = await sb().from("profiles").select("id, display_name, avatar_path").in("id", missing);
+    for (const p of (data ?? []) as { id: string; display_name: string; avatar_path: string | null }[]) map.set(p.id, { ...p, shared: 0, added: true });
+  }
+  for (const id of addedIds) { const f = map.get(id); if (f) f.added = true; }
+  return [...map.values()].sort((a, b) => b.shared - a.shared || a.display_name.localeCompare(b.display_name));
 }
+
+export async function removeFriend(uid: string, other: string) {
+  const [a, b] = uid < other ? [uid, other] : [other, uid];
+  const { error } = await sb().from("friendships").delete().eq("user_a", a).eq("user_b", b);
+  if (error) throw error;
+}
+
+export const friendUrl = (code: string) => `${window.location.origin}/add/${code}`;
 
 /** Makes sure a member has a habit on Today for this challenge (e.g. after being approved). */
 export async function ensureHabit(c: Challenge, m: Member, uid: string): Promise<string | null> {

@@ -15,6 +15,7 @@ function Welcome() {
   const router = useRouter();
   const params = useSearchParams();
   const invite = params.get("invite");
+  const friend = params.get("friend");
   const { session, profile, refreshProfile, userId } = useApp();
   const [step, setStep] = useState<Step>(params.get("step") === "name" ? "name" : "start");
   const [email, setEmail] = useState("");
@@ -27,7 +28,7 @@ function Welcome() {
   const [inv, setInv] = useState<Invite | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const next = invite ? `/join/${invite}` : "/";
+  const next = invite ? `/join/${invite}` : friend ? `/add/${friend}` : "/";
 
   useEffect(() => {
     const h = new URLSearchParams(window.location.hash.slice(1));
@@ -59,7 +60,7 @@ function Welcome() {
 
   async function sendCode() {
     setBusy(true); setErr(null);
-    const back = `${window.location.origin}/welcome${invite ? `?invite=${invite}` : ""}`;
+    const back = `${window.location.origin}/welcome${invite ? `?invite=${invite}` : friend ? `?friend=${friend}` : ""}`;
     const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: back } });
     setBusy(false);
     if (error) {

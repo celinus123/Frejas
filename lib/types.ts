@@ -7,6 +7,7 @@ export interface Profile {
   theme: "light" | "dark" | "auto";
   week_starts_monday: boolean;
   new_habits_private: boolean;
+  friend_code: string;
   created_at: string;
 }
 

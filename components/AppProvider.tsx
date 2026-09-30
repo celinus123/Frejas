@@ -22,7 +22,7 @@ export const useApp = () => {
   return c;
 };
 
-const PUBLIC = ["/welcome", "/join", "/privacy", "/terms"];
+const PUBLIC = ["/welcome", "/join", "/add", "/privacy", "/terms"];
 
 function applyTheme(t: Profile["theme"]) {
   const el = document.documentElement;
@@ -67,7 +67,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const isPublic = PUBLIC.some((p) => path.startsWith(p));
     if (!session && !isPublic) router.replace(`/welcome${window.location.hash.includes("error") ? window.location.hash : ""}`);
     else if (session && profile && !profile.display_name && !path.startsWith("/welcome")) {
-      const invite = path.startsWith("/join/") ? `&invite=${path.split("/")[2]}` : "";
+      const invite = path.startsWith("/join/") ? `&invite=${path.split("/")[2]}` : path.startsWith("/add/") ? `&friend=${path.split("/")[2]}` : "";
       router.replace(`/welcome?step=name${invite}`);
     }
   }, [ready, session, profile, path, router]);

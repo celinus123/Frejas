@@ -5,7 +5,7 @@ import { useApp } from "@/components/AppProvider";
 import { Flame, Icon } from "@/components/Icon";
 import { Avatar, BackBar } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
-import { loadHabits, myChallenges } from "@/lib/data";
+import { loadHabits, myFriends } from "@/lib/data";
 import { addDays, today } from "@/lib/dates";
 
 interface Person { id: string; display_name: string; avatar_path: string | null; shared: number }
@@ -24,17 +24,7 @@ export default function Profile() {
       let n = 0; for (let d = s.has(today()) ? today() : addDays(today(), -1); s.has(d); d = addDays(d, -1)) n++;
       setStreak(n);
     });
-    myChallenges(userId).then(async (mc) => {
-      const ids = mc.map((m) => m.challenge.id);
-      if (!ids.length) return;
-      const { data } = await supabase().from("challenge_members").select("user_id, profiles(display_name, avatar_path)").in("challenge_id", ids).neq("user_id", userId);
-      const map = new Map<string, Person>();
-      for (const r of (data ?? []) as unknown as { user_id: string; profiles: { display_name: string; avatar_path: string | null } | null }[]) {
-        const p = map.get(r.user_id) ?? { id: r.user_id, display_name: r.profiles?.display_name ?? "", avatar_path: r.profiles?.avatar_path ?? null, shared: 0 };
-        p.shared++; map.set(r.user_id, p);
-      }
-      setPeople([...map.values()].sort((a, b) => b.shared - a.shared));
-    });
+    myFriends(userId).then(setPeople).catch(() => {});
   }, [userId]);
 
   if (!profile) return null;
@@ -56,15 +46,15 @@ export default function Profile() {
         <span style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Archived habits</span>
         <Icon name="right" size={16} color="var(--ink-2)" />
       </Link>
-      <div className="label">People you challenge with</div>
+      <div className="label">Friends</div>
       {people.length ? (
         <section className="card group">
           {people.map((p) => (
             <div key={p.id} className="row"><Avatar name={p.display_name} path={p.avatar_path} size={40} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{p.display_name}</div><div className="muted" style={{ fontSize: 12.5 }}>{p.shared} challenge{p.shared > 1 ? "s" : ""} together</div></div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{p.display_name}</div><div className="muted" style={{ fontSize: 12.5 }}>{p.shared ? `${p.shared} challenge${p.shared > 1 ? "s" : ""} together` : "Friend"}</div></div></div>
           ))}
         </section>
-      ) : <div className="muted" style={{ fontSize: 14, padding: "0 4px" }}>Start a challenge and share the link to add friends.</div>}
+      ) : <div className="muted" style={{ fontSize: 14, padding: "0 4px" }}>Add friends from the Feed with your friend link, or start a challenge together.</div>}
       <Link href="/challenges/new" className="btn btn-soft"><Icon name="link" />Invite friends with a challenge</Link>
     </main>
   );
