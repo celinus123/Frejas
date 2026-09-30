@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "Frejas",
   description: "Small habits, better together.",
   appleWebApp: { capable: true, title: "Frejas", statusBarStyle: "default" },
-  icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },
+  icons: { icon: [{ url: "/favicon-48.png", sizes: "48x48" }, { url: "/icon-192.png", sizes: "192x192" }], apple: "/apple-touch-icon.png" },
 };
 
 export const viewport: Viewport = {

@@ -6,6 +6,7 @@ import { Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Avatar, Avatars, Empty } from "@/components/ui";
 import { CheckInSheet } from "@/components/CheckInSheet";
+import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
 import { supabase } from "@/lib/supabase";
 import { addDays, dayFraction, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
 import { isActive, loadChallenge, loadHabits, loadLogs, logHabit, myChallenges, unlogHabit, type MyChallenge } from "@/lib/data";
@@ -16,7 +17,8 @@ interface ChallengeCard extends MyChallenge { mine: number; rank: number; of: nu
 
 export default function Today() {
   const { userId, profile, toast } = useApp();
-  const [habits, setHabits] = useState<Habit[] | null>(null);
+  const [allHabits, setHabits] = useState<Habit[] | null>(null);
+  const [cat, setCat] = useState<string | null>(null);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [cards, setCards] = useState<ChallengeCard[]>([]);
   const [sheet, setSheet] = useState<{ card: ChallengeCard; habit: Habit; logId: string } | null>(null);
@@ -48,8 +50,11 @@ export default function Today() {
     return m;
   }, [cards]);
 
-  if (!habits || !profile) return <main className="page"><div className="skeleton" style={{ height: 60 }} /><div className="skeleton" style={{ height: 120 }} /><div className="skeleton" style={{ height: 300 }} /></main>;
+  if (!allHabits || !profile) return <main className="page"><div className="skeleton" style={{ height: 60 }} /><div className="skeleton" style={{ height: 120 }} /><div className="skeleton" style={{ height: 300 }} /></main>;
 
+  const cats = categoriesOf(allHabits);
+  const habits = allHabits.filter((h) => inCategory(h, cat));
+  const shownCards = cat ? cards.filter((c) => { const h = allHabits.find((x) => x.id === c.me.habit_id); return !!h && inCategory(h, cat); }) : cards;
   const scheduled = habits.filter((h) => isScheduledOn(h, t));
   const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= t);
   const doneToday = scheduled.filter((h) => done.has(`${h.id}|${t}`)).length;
@@ -109,7 +114,9 @@ export default function Today() {
         </div>
       </section>
 
-      {habits.length === 0 ? (
+      <CategoryFilter categories={cats} value={cat} onChange={setCat} />
+
+      {allHabits.length === 0 ? (
         <Empty icon="leaf" title="Start with one small habit" text="Pick something you can do in two minutes. You can add more later.">
           <Link href="/habits/new" className="btn btn-primary"><Icon name="plus" />Add a habit</Link>
         </Empty>
@@ -177,14 +184,14 @@ export default function Today() {
         </>
       )}
 
-      {cards.length > 0 && (
+      {shownCards.length > 0 && (
         <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
             <h2 className="h2">Challenges</h2>
             <Link href="/challenges" style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>See all</Link>
           </div>
           <div className="no-scrollbar" style={{ display: "flex", gap: 12, overflowX: "auto", margin: "0 -20px", padding: "2px 20px 8px" }}>
-            {cards.map((c, i) => (
+            {shownCards.map((c, i) => (
               <Link key={c.challenge.id} href={`/challenges/${c.challenge.id}`} className={i === 0 ? "soft" : "card"}
                 style={{ width: 236, flexShrink: 0, padding: 16, borderRadius: 24, display: "flex", flexDirection: "column", gap: 12, color: "inherit", textDecoration: "none" }}>
                 <div className="muted" style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>

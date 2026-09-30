@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { frequencyLabel } from "@/lib/dates";
@@ -7,12 +7,13 @@ import type { Frequency, Habit } from "@/lib/types";
 import { useApp } from "./AppProvider";
 import { Icon } from "./Icon";
 import { Switch } from "./ui";
+import { MAX_CATEGORIES, SUGGESTED_CATEGORIES, categoriesOf } from "./CategoryFilter";
+import { loadHabits } from "@/lib/data";
 
 const FREQS: { v: Frequency; l: string }[] = [
   { v: "daily", l: "Daily" }, { v: "specific_days", l: "Specific days" }, { v: "times_per_week", l: "Times a week" },
   { v: "every_other_week", l: "Every other week" }, { v: "monthly", l: "Monthly" },
 ];
-const CATS = ["Health", "Mind", "Fitness", "Home"];
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 const DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const IDEAS = ["Drink water", "Walk 10 min", "Read 10 pages", "Stretch"];
@@ -28,6 +29,35 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [shared, setShared] = useState(habit ? habit.visibility === "friends" : !(profile?.new_habits_private ?? true));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [used, setUsed] = useState<string[]>([]);       // categories on your other habits
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [catErr, setCatErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) return;
+    loadHabits(userId).then((hs) => setUsed(categoriesOf(hs.filter((h) => h.id !== habit?.id)))).catch(() => {});
+  }, [userId, habit?.id]);
+
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const options = [...used, ...SUGGESTED_CATEGORIES.filter((c) => !used.some((u) => same(u, c)))];
+  if (category && !options.some((o) => same(o, category))) options.push(category);
+  const full = used.length >= MAX_CATEGORIES;
+
+  function pick(c: string) {
+    setCatErr(null);
+    if (category && same(category, c)) return setCategory(null);
+    if (full && !used.some((u) => same(u, c))) return setCatErr(`You already have ${MAX_CATEGORIES} categories. Pick one of them, or move habits out of one you don't use.`);
+    setCategory(c);
+  }
+  function addCategory() {
+    const raw = draft.trim().replace(/\s+/g, " ");
+    if (!raw) { setAdding(false); return; }
+    const name = raw.charAt(0).toUpperCase() + raw.slice(1);
+    const existing = options.find((o) => same(o, name));
+    setAdding(false); setDraft("");
+    pick(existing ?? name);
+  }
 
   const valid = name.trim().length > 0 && (freq !== "specific_days" || days.length > 0);
 
@@ -51,7 +81,8 @@ export function HabitForm({ habit }: { habit?: Habit }) {
 
   async function archive() {
     if (!habit) return;
-    await supabase().from("habits").update({ archived_at: habit.archived_at ? null : new Date().toISOString() }).eq("id", habit.id);
+    const { error } = await supabase().from("habits").update({ archived_at: habit.archived_at ? null : new Date().toISOString() }).eq("id", habit.id);
+    if (error) return setErr(error.message);
     toast({ text: habit.archived_at ? "Habit restored." : "Habit archived. Your history is kept." });
     router.replace("/");
   }
@@ -108,8 +139,19 @@ export function HabitForm({ habit }: { habit?: Habit }) {
 
       <div className="label">Category <span style={{ fontWeight: 600 }}>· optional</span></div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {CATS.map((c) => <button key={c} className="chip" aria-pressed={category === c} onClick={() => setCategory(category === c ? null : c)}>{c}</button>)}
+        {options.map((c) => <button key={c} className="chip" aria-pressed={!!category && same(category, c)} onClick={() => pick(c)}>{c}</button>)}
+        {adding ? (
+          <label className="chip" style={{ paddingRight: 6 }}>
+            <input autoFocus maxLength={24} value={draft} placeholder="New category" aria-label="New category"
+              onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") addCategory(); if (e.key === "Escape") { setAdding(false); setDraft(""); } }}
+              onBlur={addCategory} style={{ border: 0, outline: 0, background: "none", width: 110, fontWeight: 700 }} />
+          </label>
+        ) : !full && (
+          <button className="chip" onClick={() => { setAdding(true); setCatErr(null); }} style={{ color: "var(--ink-2)" }}><Icon name="plus" size={15} stroke={2.2} />New</button>
+        )}
       </div>
+      {catErr ? <div role="alert" className="muted" style={{ fontSize: 12.5, padding: "0 4px", color: "var(--ink)" }}>{catErr}</div>
+        : used.length >= MAX_CATEGORIES - 3 && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>{used.length} of {MAX_CATEGORIES} categories used.</div>}
 
       <div className="label">Who can see it</div>
       <div className="card group">

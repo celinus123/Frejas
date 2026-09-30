@@ -4,6 +4,7 @@ import { useApp } from "@/components/AppProvider";
 import { Flame, Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Sheet } from "@/components/ui";
+import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
 import { addDays, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
 import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
@@ -15,8 +16,9 @@ export default function Stats() {
   const t = today();
   const [period, setPeriod] = useState<Period>("Month");
   const [anchor, setAnchor] = useState(t);
-  const [habits, setHabits] = useState<Habit[] | null>(null);
-  const [logs, setLogs] = useState<HabitLog[]>([]);
+  const [allHabits, setHabits] = useState<Habit[] | null>(null);
+  const [allLogs, setLogs] = useState<HabitLog[]>([]);
+  const [cat, setCat] = useState<string | null>(null);
   const [daySheet, setDaySheet] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -27,9 +29,13 @@ export default function Stats() {
   }, [userId, anchor]);
   useEffect(() => { load(); }, [load]);
 
-  const done = useMemo(() => new Set(logs.map((l) => `${l.habit_id}|${l.log_date}`)), [logs]);
-  if (!habits) return <main className="page"><div className="skeleton" style={{ height: 160 }} /><div className="skeleton" style={{ height: 320 }} /></main>;
+  const done = useMemo(() => new Set(allLogs.map((l) => `${l.habit_id}|${l.log_date}`)), [allLogs]);
+  if (!allHabits) return <main className="page"><div className="skeleton" style={{ height: 160 }} /><div className="skeleton" style={{ height: 320 }} /></main>;
 
+  const cats = categoriesOf(allHabits);
+  const habits = allHabits.filter((h) => inCategory(h, cat));
+  const ids = new Set(habits.map((h) => h.id));
+  const logs = cat ? allLogs.filter((l) => ids.has(l.habit_id)) : allLogs;
   const range = (from: string, to: string) => { const out: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) out.push(d); return out; };
   const a = parse(anchor);
   let from: string, to: string, title: string;
@@ -80,6 +86,8 @@ export default function Stats() {
           ))}
         </div>
       </div>
+
+      <CategoryFilter categories={cats} value={cat} onChange={setCat} />
 
       <section className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
         <Ring size={108} stroke={11} pct={pct}>

@@ -11,12 +11,7 @@ type Step = "start" | "email" | "code" | "name";
 interface Invite { name: string; starts_on: string; ends_on: string; stake: string | null; member_names: string[] }
 
 function Logo() {
-  return (
-    <div style={{ position: "relative", width: 116, height: 72 }} aria-hidden="true">
-      <div style={{ position: "absolute", left: 0, width: 72, height: 72, borderRadius: "50%", border: "10px solid var(--primary)", boxSizing: "border-box" }} />
-      <div style={{ position: "absolute", left: 44, width: 72, height: 72, borderRadius: "50%", border: "10px solid var(--accent)", boxSizing: "border-box", opacity: 0.9 }} />
-    </div>
-  );
+  return <img src="/icon-192.png" alt="" width={84} height={84} style={{ display: "block", borderRadius: 22 }} />;
 }
 
 function Welcome() {
