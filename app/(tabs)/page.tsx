@@ -1,14 +1,16 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
-import { Avatar, Avatars, Empty } from "@/components/ui";
+import { Avatar, Avatars, Empty, Sheet } from "@/components/ui";
+import { SwipeRow } from "@/components/SwipeRow";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
 import { supabase } from "@/lib/supabase";
-import { addDays, dayFraction, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
+import { addDays, dayFraction, flexPeriod, formatLong, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
 import { isActive, loadChallenge, loadHabits, loadLogs, logHabit, myChallenges, unlogHabit, type MyChallenge } from "@/lib/data";
 import { daysLeft, fmt, ordinal, sharedTotal, standings } from "@/lib/scoring";
 import type { Habit, HabitLog } from "@/lib/types";
@@ -21,12 +23,31 @@ export default function Today() {
   const [cat, setCat] = useState<string | null>(null);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [cards, setCards] = useState<ChallengeCard[]>([]);
-  const [sheet, setSheet] = useState<{ card: ChallengeCard; habit: Habit; logId: string } | null>(null);
+  const [sheet, setSheet] = useState<{ card: ChallengeCard; habit: Habit; logId: string; date: string } | null>(null);
   const t = today();
+  const router = useRouter();
+  const [sel, setSel] = useState(t);                       // the day you're looking at
+  const [from, setFrom] = useState(() => addDays(t, -40)); // how far back logs are loaded
+  const [openRow, setOpenRow] = useState<string | null>(null);
+  const [delHabit, setDelHabit] = useState<Habit | null>(null);
+  const [tip, setTip] = useState(false);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    try { setTip(!localStorage.getItem("frejas-tip-swipe")); } catch { /* storage blocked */ }
+  }, []);
+  const hideTip = () => { setTip(false); try { localStorage.setItem("frejas-tip-swipe", "1"); } catch { /* ignore */ } };
+
+  function pickDay(d: string) {
+    const day = d > t ? t : d;
+    setSel(day);
+    setOpenRow(null);
+    if (startOfWeek(day) < from) setFrom(addDays(startOfWeek(day), -7));
+  }
 
   const load = useCallback(async () => {
     if (!userId) return;
-    const [h, l, mc] = await Promise.all([loadHabits(userId), loadLogs(userId, addDays(t, -40), t), myChallenges(userId)]);
+    const [h, l, mc] = await Promise.all([loadHabits(userId), loadLogs(userId, from, t), myChallenges(userId)]);
     setHabits(h); setLogs(l);
     const active = mc.filter((x) => isActive(x.challenge));
     const full = await Promise.all(active.map(async (x) => {
@@ -39,7 +60,7 @@ export default function Today() {
       };
     }));
     setCards(full);
-  }, [userId, t]);
+  }, [userId, t, from]);
 
   useEffect(() => { load().catch(() => setHabits([])); }, [load]);
 
@@ -55,35 +76,49 @@ export default function Today() {
   const cats = categoriesOf(allHabits);
   const habits = allHabits.filter((h) => inCategory(h, cat));
   const shownCards = cat ? cards.filter((c) => { const h = allHabits.find((x) => x.id === c.me.habit_id); return !!h && inCategory(h, cat); }) : cards;
-  const scheduled = habits.filter((h) => isScheduledOn(h, t));
-  const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= t);
-  const doneToday = scheduled.filter((h) => done.has(`${h.id}|${t}`)).length;
+  const isToday = sel === t;
+  const scheduled = habits.filter((h) => isScheduledOn(h, sel));
+  const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= sel);
+  const doneToday = scheduled.filter((h) => done.has(`${h.id}|${sel}`)).length;
   const pct = scheduled.length ? Math.round((doneToday / scheduled.length) * 100) : 0;
-  const week = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(t), i));
+  const week = Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(sel), i));
+  const dayTitle = isToday ? "Today" : parse(sel).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" });
+
+  async function deleteHabit(h: Habit, archive: boolean) {
+    setDelHabit(null);
+    const { error } = archive
+      ? await supabase().from("habits").update({ archived_at: new Date().toISOString() }).eq("id", h.id)
+      : await supabase().from("habits").delete().eq("id", h.id);
+    if (error) { toast({ text: error.message }); return; }
+    toast({ text: archive ? <><b>{h.name}</b> archived. Its history is kept.</> : <><b>{h.name}</b> deleted.</> });
+    load();
+  }
 
   async function toggle(h: Habit) {
     if (!userId) return;
-    const existing = logs.find((l) => l.habit_id === h.id && l.log_date === t);
+    const day = sel;
+    const existing = logs.find((l) => l.habit_id === h.id && l.log_date === day);
     if (existing) {
       setLogs((ls) => ls.filter((l) => l.id !== existing.id));
       try { await unlogHabit(existing.id); } catch { load(); }
       return;
     }
-    const temp: HabitLog = { id: `temp-${h.id}`, habit_id: h.id, user_id: userId, log_date: t };
+    const temp: HabitLog = { id: `temp-${h.id}`, habit_id: h.id, user_id: userId, log_date: day };
     setLogs((ls) => [...ls, temp]);
     try {
-      const log = await logHabit(h.id, userId, t);
+      const log = await logHabit(h.id, userId, day);
       setLogs((ls) => ls.map((l) => (l.id === temp.id ? log : l)));
-      const card = linked.get(h.id);
+      const found = linked.get(h.id);
+      const card = found && found.challenge.starts_on <= day && day <= found.challenge.ends_on ? found : undefined;
       if (card && card.challenge.unit) {
-        setSheet({ card, habit: h, logId: log.id });
+        setSheet({ card, habit: h, logId: log.id, date: day });
         return;
       }
       if (card) {
         const { data } = await supabase().from("check_ins")
-          .insert({ challenge_id: card.challenge.id, user_id: userId, habit_log_id: log.id, title: h.name, checkin_date: t }).select().single();
+          .insert({ challenge_id: card.challenge.id, user_id: userId, habit_log_id: log.id, title: h.name, checkin_date: day }).select().single();
         toast({
-          text: <><b>{h.name} done.</b><br />Also checked in to {card.challenge.name}.</>,
+          text: <><b>{h.name} done{day === t ? "" : ` for ${formatShort(day)}`}.</b><br />Also checked in to {card.challenge.name}.</>,
           action: data ? { label: "Open", onClick: () => (window.location.href = `/challenges/${card.challenge.id}`) } : undefined,
           undo: () => { setLogs((ls) => ls.filter((l) => l.id !== log.id)); unlogHabit(log.id).then(load); },
         });
@@ -102,13 +137,28 @@ export default function Today() {
         <Link href="/profile" aria-label="Profile"><Avatar name={profile.display_name} path={profile.avatar_path} size={44} /></Link>
       </div>
 
-      <section className="card" style={{ padding: "12px 12px 14px", display: "flex", flexDirection: "column", gap: 10 }}>
-        <div className="muted" style={{ padding: "0 4px", fontSize: 13, fontWeight: 700 }}>{formatLong(t)}</div>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
+      <section className="card" style={{ padding: "8px 8px 14px", display: "flex", flexDirection: "column", gap: 8, touchAction: "pan-y" }}
+        onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
+        onPointerUp={(e) => {
+          const s0 = swipe.current; swipe.current = null;
+          if (!s0) return;
+          const dx = e.clientX - s0.x, dy = e.clientY - s0.y;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) pickDay(addDays(sel, dx < 0 ? 7 : -7));
+        }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <button className="icon-btn" aria-label="Previous week" onClick={() => pickDay(addDays(sel, -7))} style={{ width: 34, height: 34, boxShadow: "none", background: "none" }}><Icon name="left" size={18} /></button>
+          <div style={{ flex: 1, textAlign: "center", fontSize: 13, fontWeight: 700 }} aria-live="polite">{formatLong(sel)}</div>
+          {isToday
+            ? <button className="icon-btn" aria-label="Next week" disabled style={{ width: 34, height: 34, boxShadow: "none", background: "none", opacity: 0.25 }}><Icon name="right" size={18} /></button>
+            : <button onClick={() => pickDay(t)} className="tag" style={{ border: 0, fontSize: 12, fontWeight: 800, padding: "5px 10px", background: "var(--primary)", color: "var(--on-primary)" }}>Today</button>}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "0 4px" }}>
           {week.map((d) => (
             <div key={d} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>{parse(d).toLocaleDateString("en-GB", { weekday: "narrow" })}</span>
-              <DayCircle day={parse(d).getDate()} fraction={dayFraction(habits, done, d)} today={d === t} future={d > t} />
+              <div style={{ borderRadius: "50%", boxShadow: d === sel && !isToday ? "0 0 0 2px var(--primary)" : undefined }}>
+                <DayCircle day={parse(d).getDate()} fraction={dayFraction(habits, done, d)} today={d === t} future={d > t} onClick={() => pickDay(d)} />
+              </div>
             </div>
           ))}
         </div>
@@ -125,7 +175,7 @@ export default function Today() {
           {scheduled.length > 0 && (
             <section style={{ padding: "16px 18px", borderRadius: 24, display: "flex", alignItems: "center", gap: 16, background: "var(--hero)", color: "var(--on-hero)" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hero-ring)" }}>Today's progress</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hero-ring)" }}>{isToday ? "Today's progress" : `Progress · ${formatShort(sel)}`}</div>
                 <div className="font-display" style={{ fontSize: 28, fontWeight: 600 }}>{doneToday} of {scheduled.length} done</div>
               </div>
               <Ring size={76} stroke={8} pct={pct} track="rgba(255, 255, 255, 0.16)" color="var(--hero-ring)"><span style={{ fontSize: 17, fontWeight: 800 }}>{pct}%</span></Ring>
@@ -134,12 +184,21 @@ export default function Today() {
 
           {scheduled.length > 0 && (
             <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><h2 className="h2">Today</h2></div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><h2 className="h2">{dayTitle}</h2>
+                {!isToday && <span className="muted" style={{ fontSize: 12.5, fontWeight: 700 }}>Tick what you did</span>}</div>
+              {tip && (
+                <div className="muted" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "0 4px" }}>
+                  <span style={{ flex: 1 }}>Tip: swipe a habit to the left to edit or delete it. Tap a date above to fill in an earlier day.</span>
+                  <button onClick={hideTip} aria-label="Hide tip" style={{ border: 0, background: "none", color: "inherit", padding: 4 }}><Icon name="x" size={16} /></button>
+                </div>
+              )}
               {scheduled.map((h) => {
-                const on = done.has(`${h.id}|${t}`);
+                const on = done.has(`${h.id}|${sel}`);
                 const card = linked.get(h.id);
                 return (
-                  <div key={h.id} className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
+                  <SwipeRow key={h.id} label={h.name} open={openRow === h.id} onOpenChange={(o) => setOpenRow(o ? h.id : null)}
+                    onEdit={() => router.push(`/habits/${h.id}/edit`)} onDelete={() => setDelHabit(h)}>
+                  <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
                     <Link href={`/habits/${h.id}`} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, color: "inherit", textDecoration: "none" }}>
                       <span style={{ fontSize: 15, fontWeight: 700 }}>{h.name}</span>
                       <span className="muted" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, flexWrap: "wrap" }}>
@@ -152,6 +211,7 @@ export default function Today() {
                       {on && <Icon name="check" stroke={2.4} />}
                     </button>
                   </div>
+                  </SwipeRow>
                 );
               })}
             </section>
@@ -159,24 +219,27 @@ export default function Today() {
 
           {flexible.length > 0 && (
             <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <h2 className="h2">This week</h2>
+              <h2 className="h2">{isToday ? "This week" : `Week of ${formatShort(startOfWeek(sel))}`}</h2>
               {flexible.map((h) => {
-                const p = flexPeriod(h, t);
+                const p = flexPeriod(h, sel);
                 const count = logs.filter((l) => l.habit_id === h.id && l.log_date >= p.from && l.log_date <= p.to).length;
                 const reached = count >= p.target;
-                const todayDone = done.has(`${h.id}|${t}`);
+                const todayDone = done.has(`${h.id}|${sel}`);
                 return (
-                  <div key={h.id} className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
+                  <SwipeRow key={h.id} label={h.name} open={openRow === h.id} onOpenChange={(o) => setOpenRow(o ? h.id : null)}
+                    onEdit={() => router.push(`/habits/${h.id}/edit`)} onDelete={() => setDelHabit(h)}>
+                  <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
                     <Link href={`/habits/${h.id}`} style={{ flex: 1, color: "inherit", textDecoration: "none" }}>
                       <div style={{ fontSize: 15, fontWeight: 700 }}>{h.name}</div>
                       <div className="muted" style={{ fontSize: 12.5 }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}</div>
                     </Link>
                     <Ring size={34} stroke={4} pct={(Math.min(count, p.target) / p.target) * 100} />
-                    <button className="check" aria-pressed={todayDone} aria-label={todayDone ? `Undo today's ${h.name}` : `Log ${h.name} today`} onClick={() => toggle(h)}
+                    <button className="check" aria-pressed={todayDone} aria-label={todayDone ? `Undo ${h.name} for ${dayTitle}` : `Log ${h.name} for ${dayTitle}`} onClick={() => toggle(h)}
                       style={!todayDone ? { color: "var(--primary)" } : undefined} disabled={reached && !todayDone}>
                       <Icon name={todayDone ? "check" : "plus"} stroke={2.3} size={todayDone ? 20 : 18} />
                     </button>
                   </div>
+                  </SwipeRow>
                 );
               })}
             </section>
@@ -220,8 +283,22 @@ export default function Today() {
 
       {sheet && userId && (
         <CheckInSheet open onClose={() => { setSheet(null); load(); }} onSaved={() => toast({ text: <>Checked in to <b>{sheet.card.challenge.name}</b>.</> })}
-          challenge={sheet.card.challenge} userId={userId} habitId={sheet.habit.id} habitName={sheet.habit.name} habitLogId={sheet.logId} />
+          challenge={sheet.card.challenge} userId={userId} habitId={sheet.habit.id} habitName={sheet.habit.name} habitLogId={sheet.logId} initialDate={sheet.date} />
       )}
+      <Sheet open={!!delHabit} onClose={() => setDelHabit(null)} label="Delete habit">
+        {delHabit && (
+          <>
+            <div className="h1" style={{ fontSize: 24 }}>Delete {delHabit.name}?</div>
+            <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
+              Deleting removes the habit and all its ticks for good. Check-ins you&apos;ve posted in challenges stay.
+              Archiving hides it but keeps your history, and you can bring it back later.
+            </p>
+            <button className="btn btn-primary" onClick={() => deleteHabit(delHabit, false)}><Icon name="trash" />Delete for good</button>
+            <button className="btn btn-soft" onClick={() => deleteHabit(delHabit, true)}><Icon name="archive" />Archive instead</button>
+            <button className="btn" style={{ background: "none" }} onClick={() => setDelHabit(null)}>Cancel</button>
+          </>
+        )}
+      </Sheet>
     </main>
   );
 }

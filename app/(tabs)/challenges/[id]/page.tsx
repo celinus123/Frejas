@@ -44,7 +44,8 @@ function ChallengePage({ id }: { id: string }) {
   const { userId, toast } = useApp();
   const [data, setData] = useState<{ challenge: Challenge | null; members: Member[]; checkins: CheckIn[] } | null>(null);
   const [tab, setTab] = useState<Tab>("Overview");
-  const [checkin, setCheckin] = useState<{ existing?: CheckIn } | null>(params.get("checkin") ? {} : null);
+  const [checkin, setCheckin] = useState<{ existing?: CheckIn; date?: string } | null>(params.get("checkin") ? {} : null);
+  const [weekIdx, setWeekIdx] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(params.get("created") === "1");
   const [menu, setMenu] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -115,7 +116,9 @@ function ChallengePage({ id }: { id: string }) {
   const url = inviteUrl(c.invite_token);
   const myCheckins = data.checkins.filter((x) => x.user_id === userId);
   const weeks = isV2(c) ? weekResults(c, me, myCheckins) : [];
-  const thisWeek = weeks.find((w) => w.isCurrent);
+  const curIdx = weeks.findIndex((w) => w.isCurrent);
+  const wi = weekIdx !== null && weeks[weekIdx] && !weeks[weekIdx].isFuture ? weekIdx : curIdx >= 0 ? curIdx : weeks.length - 1;
+  const thisWeek = weeks[wi];
 
   async function share() {
     const r = await shareLink(url, c!.name);
@@ -230,19 +233,29 @@ function ChallengePage({ id }: { id: string }) {
 
   const weekCard = thisWeek && (
     <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 15, fontWeight: 800 }}>This week</span><span style={{ fontSize: 13, fontWeight: 800 }}>{thisWeek.done} of {thisWeek.target}</span></div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <button className="icon-btn" aria-label="Previous week" disabled={wi <= 0} onClick={() => setWeekIdx(wi - 1)} style={{ width: 30, height: 30, boxShadow: "none", background: "none", opacity: wi <= 0 ? 0.25 : 1 }}><Icon name="left" size={16} /></button>
+        <span style={{ flex: 1, fontSize: 15, fontWeight: 800 }}>{thisWeek.isCurrent ? "This week" : `${formatShort(thisWeek.from)} – ${formatShort(thisWeek.to)}`}</span>
+        <span style={{ fontSize: 13, fontWeight: 800 }}>{thisWeek.done} of {thisWeek.target}</span>
+        <button className="icon-btn" aria-label="Next week" disabled={thisWeek.isCurrent || !weeks[wi + 1] || weeks[wi + 1].isFuture} onClick={() => setWeekIdx(wi + 1)}
+          style={{ width: 30, height: 30, boxShadow: "none", background: "none", opacity: thisWeek.isCurrent || !weeks[wi + 1] || weeks[wi + 1].isFuture ? 0.25 : 1 }}><Icon name="right" size={16} /></button>
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         {Array.from({ length: 7 }, (_, i) => {
           const d = addDays(thisWeek.from, i - (weekday(thisWeek.from) - 1));
           const inRange = d >= c.starts_on && d <= c.ends_on;
-          const done = myCheckins.some((x) => x.checkin_date === d);
+          const dayCi = myCheckins.find((x) => x.checkin_date === d);
+          const done = !!dayCi;
           const planned = c.frequency === "specific_days" ? (c.days ?? []).includes(i + 1) : true;
+          const tappable = inRange && d <= t && !finished;
           return (
             <div key={d} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5, opacity: inRange ? 1 : 0.35 }}>
               <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>{"MTWTFSS"[i]}</span>
-              <div style={{ width: 34, height: 34, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: done ? "var(--primary)" : d === t ? "var(--soft-l)" : "none", color: "var(--on-primary)", border: done ? 0 : `2px ${planned ? "solid" : "dotted"} var(--soft)`, boxSizing: "border-box" }}>
-                {done && <Icon name="check" size={16} stroke={2.6} />}
-              </div>
+              <button disabled={!tappable} onClick={() => setCheckin(dayCi ? { existing: dayCi } : { date: d })}
+                aria-label={done ? `Edit check-in for ${formatShort(d)}` : `Check in for ${formatShort(d)}`}
+                style={{ width: 34, height: 34, padding: 0, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: done ? "var(--primary)" : d === t ? "var(--soft-l)" : "none", color: "var(--on-primary)", border: done ? 0 : `2px ${planned ? "solid" : "dotted"} var(--soft)`, boxSizing: "border-box", cursor: tappable ? "pointer" : "default" }}>
+                {done ? <Icon name="check" size={16} stroke={2.6} /> : tappable && d !== t && <span style={{ fontSize: 11, fontWeight: 800, color: "var(--ink-2)" }}>{parse(d).getDate()}</span>}
+              </button>
             </div>
           );
         })}
@@ -256,7 +269,7 @@ function ChallengePage({ id }: { id: string }) {
       <div style={{ display: "flex", gap: 4 }}>
         {weeks.map((w, i) => {
           const full = w.done >= w.target && !w.isFuture;
-          return <div key={i} title={`${formatShort(w.from)}: ${w.done}/${w.target}`} style={{ flex: 1, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
+          return <div key={i} title={`${formatShort(w.from)}: ${w.done}/${w.target}`} role={w.isFuture ? undefined : "button"} onClick={() => !w.isFuture && setWeekIdx(i)} style={{ cursor: w.isFuture ? "default" : "pointer", flex: 1, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
             background: full ? "var(--primary)" : w.done ? "var(--primary-l)" : "var(--soft-l)", color: full ? "var(--on-primary)" : "var(--ink)", outline: w.isCurrent ? "2px solid var(--primary)" : "none", outlineOffset: 1 }}>{w.isFuture ? "" : w.done}</div>;
         })}
       </div>
@@ -354,7 +367,7 @@ function ChallengePage({ id }: { id: string }) {
       <>
         {checkin && userId && (
           <CheckInSheet open onClose={() => setCheckin(null)} onSaved={() => { toast({ text: checkin.existing ? "Check-in updated." : <><b>Checked in!</b> Nice work.</> }); load(); }}
-            challenge={c!} userId={userId} habitId={me!.habit_id} habitName={habitName} existing={checkin.existing ?? null} minAmount={isV2(c!) ? (c!.same_goal ? c!.min_amount : me!.goal_amount ?? c!.min_amount) : null} />
+            challenge={c!} userId={userId} habitId={me!.habit_id} habitName={habitName} existing={checkin.existing ?? null} initialDate={checkin.date} minAmount={isV2(c!) ? (c!.same_goal ? c!.min_amount : me!.goal_amount ?? c!.min_amount) : null} />
         )}
         <Sheet open={shareOpen} onClose={() => setShareOpen(false)} label="Invite friends">
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center", paddingTop: 6 }}>

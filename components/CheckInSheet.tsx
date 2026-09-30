@@ -19,12 +19,14 @@ interface Props {
   habitLogId?: string | null;      // when opened right after ticking the habit on Today
   existing?: CheckIn | null;       // edit mode
   minAmount?: number | null;       // a check-in only counts at or above this
+  initialDate?: string;            // e.g. a past day picked on Today or in the week view
 }
 
-export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitId, habitName, habitLogId, existing, minAmount }: Props) {
+export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitId, habitName, habitLogId, existing, minAmount, initialDate }: Props) {
   const t = today();
   const maxDate = t < challenge.ends_on ? t : challenge.ends_on;
-  const [date, setDate] = useState(existing?.checkin_date ?? maxDate);
+  const startDate = initialDate && initialDate <= maxDate && initialDate >= challenge.starts_on ? initialDate : maxDate;
+  const [date, setDate] = useState(existing?.checkin_date ?? startDate);
   const [title, setTitle] = useState(existing?.title ?? habitName ?? challenge.name);
   const [amount, setAmount] = useState(existing?.amount?.toString() ?? "");
   const [comment, setComment] = useState(existing?.comment ?? "");
@@ -36,12 +38,12 @@ export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitI
 
   useEffect(() => {
     if (!open) return;
-    setDate(existing?.checkin_date ?? maxDate);
+    setDate(existing?.checkin_date ?? startDate);
     setTitle(existing?.title ?? habitName ?? challenge.name);
     setAmount(existing?.amount?.toString() ?? "");
     setComment(existing?.comment ?? "");
     setFile(null); setPreview(null); setErr(null);
-  }, [open, existing, habitName, challenge.name, maxDate]);
+  }, [open, existing, habitName, challenge.name, startDate]);
 
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
 
