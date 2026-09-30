@@ -61,6 +61,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
 
+  // When a new version is published, reload the next time the app comes back to the foreground
+  // (a phone keeps a home-screen app open for days, so it would otherwise keep running old code).
+  useEffect(() => {
+    const mine = process.env.NEXT_PUBLIC_BUILD_ID;
+    if (!mine || mine === "dev") return;
+    let checking = false;
+    const check = async () => {
+      if (checking || document.visibilityState !== "visible") return;
+      checking = true;
+      try {
+        const r = await fetch("/api/version", { cache: "no-store" });
+        const { build } = await r.json();
+        const typing = document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName);
+        if (build && build !== "dev" && build !== mine && !typing && !document.querySelector(".sheet")) window.location.reload();
+      } catch { /* offline: try again later */ }
+      checking = false;
+    };
+    const onVis = () => { if (document.visibilityState === "visible") check(); };
+    document.addEventListener("visibilitychange", onVis);
+    const id = setInterval(check, 5 * 60 * 1000);
+    check();
+    return () => { document.removeEventListener("visibilitychange", onVis); clearInterval(id); };
+  }, []);
+
   // Route guard: signed-out users go to /welcome, new users pick a name first.
   useEffect(() => {
     if (!ready) return;

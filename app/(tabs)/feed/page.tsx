@@ -60,6 +60,21 @@ export default function Feed() {
   }, [userId, t, profile?.avatar_path]);
   useEffect(() => { load().catch(() => setItems([])); }, [load]);
 
+  // stay current: new check-ins and shared ticks arrive live, and coming back to the app refreshes
+  useEffect(() => {
+    if (!userId) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const soon = () => { if (timer) clearTimeout(timer); timer = setTimeout(() => load().catch(() => {}), 800); };
+    const sb = supabase();
+    const ch = sb.channel(`feed-${userId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "check_ins" }, soon)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "habit_logs" }, soon)
+      .subscribe();
+    const onVis = () => { if (document.visibilityState === "visible") soon(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => { sb.removeChannel(ch); document.removeEventListener("visibilitychange", onVis); if (timer) clearTimeout(timer); };
+  }, [userId, load]);
+
   const names = Object.fromEntries(chs.map((c) => [c.challenge.id, c.challenge]));
 
   async function like(ci: CheckIn) {

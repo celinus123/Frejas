@@ -9,6 +9,8 @@ const securityHeaders = [
 ];
 
 const config: NextConfig = {
+  // lets an open app notice that a newer version has been published
+  env: { NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev" },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

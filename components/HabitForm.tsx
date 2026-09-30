@@ -9,6 +9,7 @@ import { Icon } from "./Icon";
 import { Switch } from "./ui";
 import { MAX_CATEGORIES, SUGGESTED_CATEGORIES, categoriesOf } from "./CategoryFilter";
 import { loadHabits } from "@/lib/data";
+import { bestMatch } from "@/lib/similar";
 
 const FREQS: { v: Frequency; l: string }[] = [
   { v: "daily", l: "Daily" }, { v: "specific_days", l: "Specific days" }, { v: "times_per_week", l: "Times a week" },
@@ -118,6 +119,16 @@ export function HabitForm({ habit }: { habit?: Habit }) {
       </div>
 
       <label className="field"><input autoFocus={!habit} maxLength={60} placeholder="e.g. Read 20 minutes" value={name} onChange={(e) => setName(e.target.value)} aria-label="Habit name" /></label>
+      {!habit && name.trim().length >= 3 && (() => {
+        const twin = bestMatch(name, others);
+        return twin && (
+          <div className="soft" role="status" style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 16, fontSize: 13.5, lineHeight: 1.4 }}>
+            <Icon name="repeat" size={18} color="var(--primary)" />
+            <span style={{ flex: 1 }}>You already have <b>{twin.name}</b>. Use that one instead of making a copy?</span>
+            <button className="btn btn-sm" style={{ background: "var(--surface)", height: 34 }} onClick={() => router.replace(`/habits/${twin.id}`)}>Open it</button>
+          </div>
+        );
+      })()}
       {!habit && !name && (
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{IDEAS.map((i) => <button key={i} className="chip" onClick={() => setName(i)}>{i}</button>)}</div>
       )}
