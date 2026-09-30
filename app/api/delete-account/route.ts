@@ -31,6 +31,11 @@ export async function POST(req: Request) {
   for (const c of created ?? []) {
     const { data: next } = await admin.from("challenge_members").select("user_id").eq("challenge_id", c.id).neq("user_id", uid).order("joined_at").limit(1).maybeSingle();
     if (next) await admin.rpc("transfer_challenge", { p_challenge: c.id, p_new_creator: next.user_id });
+    else {
+      // nobody else is in it, so it is deleted with the user: remove its cover photos too
+      const { data: covers } = await admin.storage.from("covers").list(c.id);
+      if (covers?.length) await admin.storage.from("covers").remove(covers.map((f) => `${c.id}/${f.name}`));
+    }
   }
 
   const { error } = await admin.auth.admin.deleteUser(uid);
