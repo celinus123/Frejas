@@ -5,7 +5,7 @@ import { signedUrls } from "@/lib/photos";
 
 export const PRESETS: CoverPreset[] = ["arches", "waves", "sun", "dots", "leaf", "stripes"];
 
-const S = "var(--soft)", SL = "var(--soft-l)", PL = "var(--primary-l)", AB = "var(--accent-bg)", W = "var(--surface)";
+const S = "var(--soft)", SL = "var(--soft-l)", PL = "var(--cover)", AB = "var(--accent-bg)", W = "var(--surface)";
 
 function Shapes({ kind }: { kind: CoverPreset }) {
   switch (kind) {

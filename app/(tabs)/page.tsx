@@ -116,12 +116,12 @@ export default function Today() {
       ) : (
         <>
           {scheduled.length > 0 && (
-            <section className="soft" style={{ padding: "16px 18px", borderRadius: 24, display: "flex", alignItems: "center", gap: 16 }}>
+            <section style={{ padding: "16px 18px", borderRadius: 24, display: "flex", alignItems: "center", gap: 16, background: "var(--hero)", color: "var(--on-hero)" }}>
               <div style={{ flex: 1 }}>
-                <div className="muted" style={{ fontSize: 13, fontWeight: 700 }}>Today's progress</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hero-ring)" }}>Today's progress</div>
                 <div className="font-display" style={{ fontSize: 28, fontWeight: 600 }}>{doneToday} of {scheduled.length} done</div>
               </div>
-              <Ring size={76} stroke={8} pct={pct} track="var(--surface)"><span style={{ fontSize: 17, fontWeight: 800 }}>{pct}%</span></Ring>
+              <Ring size={76} stroke={8} pct={pct} track="rgba(255, 255, 255, 0.16)" color="var(--hero-ring)"><span style={{ fontSize: 17, fontWeight: 800 }}>{pct}%</span></Ring>
             </section>
           )}
 
