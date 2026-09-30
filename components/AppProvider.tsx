@@ -65,7 +65,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     const isPublic = PUBLIC.some((p) => path.startsWith(p));
-    if (!session && !isPublic) router.replace("/welcome");
+    if (!session && !isPublic) router.replace(`/welcome${window.location.hash.includes("error") ? window.location.hash : ""}`);
     else if (session && profile && !profile.display_name && !path.startsWith("/welcome")) {
       const invite = path.startsWith("/join/") ? `&invite=${path.split("/")[2]}` : "";
       router.replace(`/welcome?step=name${invite}`);

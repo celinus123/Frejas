@@ -38,6 +38,17 @@ function Welcome() {
   const next = invite ? `/join/${invite}` : "/";
 
   useEffect(() => {
+    const h = new URLSearchParams(window.location.hash.slice(1));
+    if (h.get("error_code") || h.get("error")) {
+      setErr(h.get("error_code") === "otp_expired" || /expired|invalid/i.test(h.get("error_description") ?? "")
+        ? "That sign-in link has already been used or has expired. Send yourself a new one."
+        : h.get("error_description") ?? "Sign-in didn't work. Try again.");
+      setStep("email");
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, []);
+
+  useEffect(() => {
     if (invite) supabase().rpc("get_invite", { p_token: invite }).then(({ data }) => setInv((data as Invite[] | null)?.[0] ?? null));
   }, [invite]);
 
@@ -59,7 +70,10 @@ function Welcome() {
     const back = `${window.location.origin}/welcome${invite ? `?invite=${invite}` : ""}`;
     const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: back } });
     setBusy(false);
-    if (error) return setErr(error.message);
+    if (error) {
+      const limited = error.status === 429 || /rate limit|only request this after/i.test(error.message);
+      return setErr(limited ? "Too many emails in a short time. Wait a little and try again, or use the last email we sent you." : error.message);
+    }
     setStep("code"); setCode(""); setResendIn(45);
   }
 
