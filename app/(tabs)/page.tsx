@@ -8,7 +8,8 @@ import { DayCircle, Ring } from "@/components/Ring";
 import { Avatar, Avatars, Empty, Sheet } from "@/components/ui";
 import { SwipeRow } from "@/components/SwipeRow";
 import { CheckInSheet } from "@/components/CheckInSheet";
-import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
+import { CHALLENGES, CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
+import { similar } from "@/lib/similar";
 import { supabase } from "@/lib/supabase";
 import { addDays, dayFraction, flexPeriod, formatLong, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
 import { isActive, loadChallenge, loadHabits, loadLogs, logHabit, myChallenges, unlogHabit, type MyChallenge } from "@/lib/data";
@@ -23,6 +24,8 @@ export default function Today() {
   const [cat, setCat] = useState<string | null>(null);
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [cards, setCards] = useState<ChallengeCard[]>([]);
+  const [mine, setMine] = useState<MyChallenge[]>([]);
+  const [noMerge, setNoMerge] = useState<string[]>([]);
   const [sheet, setSheet] = useState<{ card: ChallengeCard; habit: Habit; logId: string; date: string } | null>(null);
   const t = today();
   const router = useRouter();
@@ -34,7 +37,7 @@ export default function Today() {
   const swipe = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
-    try { setTip(!localStorage.getItem("frejas-tip-swipe")); } catch { /* storage blocked */ }
+    try { setTip(!localStorage.getItem("frejas-tip-swipe")); setNoMerge(JSON.parse(localStorage.getItem("frejas-no-merge") || "[]")); } catch { /* storage blocked */ }
   }, []);
   const hideTip = () => { setTip(false); try { localStorage.setItem("frejas-tip-swipe", "1"); } catch { /* ignore */ } };
 
@@ -48,7 +51,7 @@ export default function Today() {
   const load = useCallback(async () => {
     if (!userId) return;
     const [h, l, mc] = await Promise.all([loadHabits(userId), loadLogs(userId, from, t), myChallenges(userId)]);
-    setHabits(h); setLogs(l);
+    setHabits(h); setLogs(l); setMine(mc);
     const active = mc.filter((x) => isActive(x.challenge));
     const full = await Promise.all(active.map(async (x) => {
       const d = await loadChallenge(x.challenge.id);
@@ -74,8 +77,43 @@ export default function Today() {
   if (!allHabits || !profile) return <main className="page"><div className="skeleton" style={{ height: 60 }} /><div className="skeleton" style={{ height: 120 }} /><div className="skeleton" style={{ height: 300 }} /></main>;
 
   const cats = categoriesOf(allHabits);
-  const habits = allHabits.filter((h) => inCategory(h, cat));
-  const shownCards = cat ? cards.filter((c) => { const h = allHabits.find((x) => x.id === c.me.habit_id); return !!h && inCategory(h, cat); }) : cards;
+  const chIds = new Set(cards.map((c) => c.me.habit_id).filter((x): x is string => !!x));
+  const habits = allHabits.filter((h) => inCategory(h, cat, chIds));
+  const shownCards = cat && cat !== CHALLENGES ? cards.filter((c) => { const h = allHabits.find((x) => x.id === c.me.habit_id); return !!h && inCategory(h, cat, chIds); }) : cards;
+
+  // a challenge habit that looks like one you already had: offer to merge them
+  const pairKey = (a: string, b: string) => [a, b].sort().join("|");
+  let suggestion: { from: Habit; into: Habit; challenge: string } | null = null;
+  for (const c of cards) {
+    const l = allHabits.find((h) => h.id === c.me.habit_id);
+    if (!l) continue;
+    const o = allHabits.find((h) => h.id !== l.id && !chIds.has(h.id) && similar(h.name, l.name) && !noMerge.includes(pairKey(l.id, h.id)));
+    if (!o) continue;
+    const into = l.from_challenge && !o.from_challenge ? o : !l.from_challenge && o.from_challenge ? l : l.created_at <= o.created_at ? l : o;
+    suggestion = { from: into.id === l.id ? o : l, into, challenge: c.challenge.name };
+    break;
+  }
+  // a habit made for a challenge that has ended: keep it or put it away?
+  const ended = allHabits.map((h) => ({ h, c: mine.find((m) => m.challenge.id === h.from_challenge && m.challenge.ends_on < t)?.challenge }))
+    .find((x) => x.c);
+
+  async function merge(from: Habit, into: Habit) {
+    const { error } = await supabase().rpc("merge_habits", { p_from: from.id, p_into: into.id });
+    if (error) { toast({ text: error.message }); return; }
+    toast({ text: <>Merged into <b>{into.name}</b>. All ticks are kept.</> });
+    load();
+  }
+  function keepBoth(a: Habit, b: Habit) {
+    const next = [...noMerge, pairKey(a.id, b.id)];
+    setNoMerge(next);
+    try { localStorage.setItem("frejas-no-merge", JSON.stringify(next)); } catch { /* ignore */ }
+  }
+  async function keepHabit(h: Habit, keep: boolean) {
+    const { error } = await supabase().from("habits").update(keep ? { from_challenge: null } : { archived_at: new Date().toISOString() }).eq("id", h.id);
+    if (error) { toast({ text: error.message }); return; }
+    toast({ text: keep ? <><b>{h.name}</b> stays on Today.</> : <><b>{h.name}</b> archived. Find it under Profile → Archived habits.</> });
+    load();
+  }
   const isToday = sel === t;
   const scheduled = habits.filter((h) => isScheduledOn(h, sel));
   const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= sel);
@@ -164,7 +202,38 @@ export default function Today() {
         </div>
       </section>
 
-      <CategoryFilter categories={cats} value={cat} onChange={setCat} />
+      <CategoryFilter categories={cats} value={cat} onChange={setCat} challenges={chIds.size > 0} />
+
+      {suggestion && (
+        <section className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <Icon name="repeat" color="var(--primary)" />
+            <div style={{ flex: 1, fontSize: 14, lineHeight: 1.45 }}>
+              <b>{suggestion.from.name}</b> and <b>{suggestion.into.name}</b> look like the same thing. Merge them into <b>{suggestion.into.name}</b>?
+              <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>All ticks from both are kept. Ticking {suggestion.into.name} counts for {suggestion.challenge}, and it keeps going after the challenge ends.</div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-soft btn-sm" style={{ flex: 1 }} onClick={() => keepBoth(suggestion!.from, suggestion!.into)}>Keep both</button>
+            <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => merge(suggestion!.from, suggestion!.into)}>Merge</button>
+          </div>
+        </section>
+      )}
+
+      {!suggestion && ended && (
+        <section className="card" style={{ padding: 16, display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+            <Icon name="flag" color="var(--primary)" />
+            <div style={{ flex: 1, fontSize: 14, lineHeight: 1.45 }}>
+              <b>{ended.c!.name}</b> has ended. Keep <b>{ended.h.name}</b> as a habit on Today?
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="btn btn-soft btn-sm" style={{ flex: 1 }} onClick={() => keepHabit(ended.h, false)}>Archive it</button>
+            <button className="btn btn-primary btn-sm" style={{ flex: 1 }} onClick={() => keepHabit(ended.h, true)}>Keep it</button>
+          </div>
+        </section>
+      )}
 
       {allHabits.length === 0 ? (
         <Empty icon="leaf" title="Start with one small habit" text="Pick something you can do in two minutes. You can add more later.">

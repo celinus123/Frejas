@@ -10,6 +10,7 @@ import { Avatars } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { formatShort, today } from "@/lib/dates";
 import { loadHabits } from "@/lib/data";
+import { bestMatch } from "@/lib/similar";
 import { fmt, scheduleLabel, winRuleLabel } from "@/lib/scoring";
 import type { Challenge, CoverPreset, Habit } from "@/lib/types";
 
@@ -44,7 +45,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
 
   useEffect(() => {
     if (!userId || !inv) return;
-    loadHabits(userId).then(setHabits);
+    loadHabits(userId).then((hs) => { setHabits(hs); const m = bestMatch(inv.name, hs); if (m) setHabitId(m.id); });
     supabase().from("challenge_members").select("challenge_id").eq("challenge_id", inv.challenge_id).eq("user_id", userId).maybeSingle()
       .then(({ data }) => { if (data) router.replace(`/challenges/${inv.challenge_id}`); });
     supabase().from("join_requests").select("challenge_id").eq("challenge_id", inv.challenge_id).eq("user_id", userId).maybeSingle()
@@ -84,8 +85,8 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
           owner_id: userId, name: inv.name.slice(0, 60), frequency: inv.frequency,
           days: inv.frequency === "specific_days" ? inv.days : null,
           times_per_week: inv.frequency === "times_per_week" ? (pTimes ?? inv.times_per_week) : null,
-          starts_on: start,
-        } : { owner_id: userId, name: inv.name.slice(0, 60), frequency: "daily" }).select("id").single();
+          starts_on: start, from_challenge: inv.challenge_id,
+        } : { owner_id: userId, name: inv.name.slice(0, 60), frequency: "daily", from_challenge: inv.challenge_id }).select("id").single();
         if (error) throw error;
         hid = data.id;
       }
@@ -142,15 +143,18 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
         </>
       ) : !profile?.display_name ? null : (
         <>
-          {!v2 && (
+          {habits.length > 0 && (
             <>
-              <div className="label">Habit it counts for</div>
+              <div className="label">Counts on</div>
               <label className="field"><Icon name="sun" color="var(--ink-2)" />
                 <select value={habitId} onChange={(e) => setHabitId(e.target.value)} aria-label="Habit" style={{ border: 0, background: "none", width: "100%", fontSize: 15, fontWeight: 700, outline: 0 }}>
                   <option value="new">New habit: {inv.name}</option>
                   {habits.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
                 </select>
               </label>
+              <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>
+                {habitId === "new" ? "A new habit shows up on Today. When the challenge ends, you choose whether to keep it." : "Ticking this habit on Today checks you in here too."}
+              </div>
             </>
           )}
           {askTimes && (

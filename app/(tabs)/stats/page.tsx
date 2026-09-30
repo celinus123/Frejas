@@ -5,6 +5,7 @@ import { Flame, Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Sheet } from "@/components/ui";
 import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
+import { supabase } from "@/lib/supabase";
 import { addDays, bonusSessions, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
 import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
@@ -19,6 +20,7 @@ export default function Stats() {
   const [allHabits, setHabits] = useState<Habit[] | null>(null);
   const [allLogs, setLogs] = useState<HabitLog[]>([]);
   const [cat, setCat] = useState<string | null>(null);
+  const [chIds, setChIds] = useState<Set<string>>(new Set());
   const [daySheet, setDaySheet] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -28,12 +30,17 @@ export default function Stats() {
     setHabits(h.filter((x) => !x.archived_at)); setLogs(l);
   }, [userId, anchor]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!userId) return;
+    supabase().from("challenge_members").select("habit_id").eq("user_id", userId).then(({ data }) =>
+      setChIds(new Set(((data ?? []) as { habit_id: string | null }[]).map((r) => r.habit_id).filter((x): x is string => !!x))));
+  }, [userId]);
 
   const done = useMemo(() => new Set(allLogs.map((l) => `${l.habit_id}|${l.log_date}`)), [allLogs]);
   if (!allHabits) return <main className="page"><div className="skeleton" style={{ height: 160 }} /><div className="skeleton" style={{ height: 320 }} /></main>;
 
   const cats = categoriesOf(allHabits);
-  const habits = allHabits.filter((h) => inCategory(h, cat));
+  const habits = allHabits.filter((h) => inCategory(h, cat, chIds));
   const ids = new Set(habits.map((h) => h.id));
   const logs = cat ? allLogs.filter((l) => ids.has(l.habit_id)) : allLogs;
   const range = (from: string, to: string) => { const out: string[] = []; for (let d = from; d <= to; d = addDays(d, 1)) out.push(d); return out; };
@@ -87,7 +94,7 @@ export default function Stats() {
         </div>
       </div>
 
-      <CategoryFilter categories={cats} value={cat} onChange={setCat} />
+      <CategoryFilter categories={cats} value={cat} onChange={setCat} challenges={allHabits.some((h) => chIds.has(h.id))} />
 
       <section className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
         <Ring size={108} stroke={11} pct={pct}>

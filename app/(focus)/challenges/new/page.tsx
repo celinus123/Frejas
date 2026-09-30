@@ -7,10 +7,11 @@ import { Avatar, Sheet } from "@/components/ui";
 import { Cover, PRESETS } from "@/components/Cover";
 import { supabase } from "@/lib/supabase";
 import { addDays, formatShort, iso, parse, startOfWeek, today } from "@/lib/dates";
-import { myFriends } from "@/lib/data";
+import { loadHabits, myFriends } from "@/lib/data";
+import { bestMatch } from "@/lib/similar";
 import { uploadCover } from "@/lib/photos";
 import { planWeeks, scheduleLabel } from "@/lib/scoring";
-import type { Challenge, CoverPreset } from "@/lib/types";
+import type { Challenge, CoverPreset, Habit } from "@/lib/types";
 
 type Freq = "daily" | "specific_days" | "times_per_week";
 type Unit = "" | "min" | "km" | "steps";
@@ -97,6 +98,9 @@ function NewChallenge() {
   const [joinMode, setJoinMode] = useState<"approve" | "open">("approve");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [myHabits, setMyHabits] = useState<Habit[]>([]);
+  const [linkTo, setLinkTo] = useState<string | null>(null);   // an existing habit it counts on; null = make a new one
+  const [linkTouched, setLinkTouched] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const preview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : null), [coverFile]);
 
@@ -104,6 +108,9 @@ function NewChallenge() {
   const total = solo ? 2 : 4;
 
   useEffect(() => { if (userId) myFriends(userId).then(setFriends).catch(() => {}); }, [userId]);
+  useEffect(() => { if (userId) loadHabits(userId).then(setMyHabits).catch(() => {}); }, [userId]);
+  // suggest an existing habit with a similar name, until you choose yourself
+  useEffect(() => { if (!linkTouched) setLinkTo(bestMatch(name, myHabits)?.id ?? null); }, [name, myHabits, linkTouched]);
 
   // continue a draft
   useEffect(() => {
@@ -158,12 +165,17 @@ function NewChallenge() {
     setBusy(true); setErr(null);
     try {
       const cid = await saveRow("active");
-      const { data: habit, error: he } = await supabase().from("habits").insert({
-        owner_id: userId, name: name.trim().slice(0, 60), frequency: freq,
-        days: freq === "specific_days" ? [...days].sort() : null, times_per_week: freq === "times_per_week" ? times : null,
-        starts_on: start > t ? start : null,
-      }).select("id").single();
-      if (he) throw he;
+      let habit: { id: string };
+      if (linkTo) habit = { id: linkTo };
+      else {
+        const { data, error: he } = await supabase().from("habits").insert({
+          owner_id: userId, name: name.trim().slice(0, 60), frequency: freq,
+          days: freq === "specific_days" ? [...days].sort() : null, times_per_week: freq === "times_per_week" ? times : null,
+          starts_on: start > t ? start : null, from_challenge: cid,
+        }).select("id").single();
+        if (he) throw he;
+        habit = data;
+      }
       const { error: me } = await supabase().from("challenge_members").insert({
         challenge_id: cid, user_id: userId, habit_id: habit.id, goal_amount: unit ? minAmount : null, times_per_week: freq === "times_per_week" ? times : null,
       });
@@ -306,10 +318,36 @@ function NewChallenge() {
             <div style={{ fontSize: 15, fontWeight: 800 }}>{name.trim() || "Your challenge"} · {schedule}</div>
             <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
               {start === t ? "Starts today" : `Starts ${parse(start).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}`} · {sessions} sessions over {weeks} weeks
-              {freq === "times_per_week" && ". Extra sessions don't carry over."}
+              {freq === "times_per_week" && ". Extra sessions count as bonus."}
             </div>
           </div>
         </div>
+        {myHabits.length > 0 && (
+          <>
+            <div className="label">Counts on</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="chip" aria-pressed={!linkTo} onClick={() => { setLinkTo(null); setLinkTouched(true); }}>New habit</button>
+              {(() => {
+                const sug = bestMatch(name, myHabits);
+                const picked = myHabits.find((h) => h.id === linkTo);
+                const show = [sug, picked && picked.id !== sug?.id ? picked : null].filter((h): h is Habit => !!h);
+                return show.map((h) => <button key={h.id} className="chip" aria-pressed={linkTo === h.id} onClick={() => { setLinkTo(h.id); setLinkTouched(true); }}>{h.name}</button>);
+              })()}
+              <label className="chip" style={{ position: "relative", color: "var(--ink-2)" }}>
+                Another habit…
+                <select value="" onChange={(e) => { if (e.target.value) { setLinkTo(e.target.value); setLinkTouched(true); } }} aria-label="Pick one of your habits"
+                  style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}>
+                  <option value="">Pick a habit</option>
+                  {myHabits.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", lineHeight: 1.45 }}>
+              {linkTo ? <>Ticking <b style={{ color: "var(--ink)" }}>{myHabits.find((h) => h.id === linkTo)?.name}</b> on Today checks you in here. It keeps going after the challenge ends.</>
+                : "A new habit shows up on Today while the challenge runs. When it ends, you choose whether to keep it."}
+            </div>
+          </>
+        )}
         {errBox}
         <div style={{ flex: 1 }} />
         {solo ? <button className="btn btn-primary" disabled={busy || (freq === "specific_days" && !days.length)} onClick={create} style={{ marginTop: 10 }}><Icon name="check" stroke={2.4} />{busy ? "Creating…" : "Create challenge"}</button>

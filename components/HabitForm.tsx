@@ -33,10 +33,13 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [catErr, setCatErr] = useState<string | null>(null);
+  const [others, setOthers] = useState<Habit[]>([]);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeInto, setMergeInto] = useState("");
 
   useEffect(() => {
     if (!userId) return;
-    loadHabits(userId).then((hs) => setUsed(categoriesOf(hs.filter((h) => h.id !== habit?.id)))).catch(() => {});
+    loadHabits(userId).then((hs) => { const rest = hs.filter((h) => h.id !== habit?.id); setUsed(categoriesOf(rest)); setOthers(rest); }).catch(() => {});
   }, [userId, habit?.id]);
 
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
@@ -85,6 +88,16 @@ export function HabitForm({ habit }: { habit?: Habit }) {
     if (error) return setErr(error.message);
     toast({ text: habit.archived_at ? "Habit restored." : "Habit archived. Your history is kept." });
     router.replace("/");
+  }
+
+  async function merge() {
+    if (!habit || !mergeInto) return;
+    const target = others.find((o) => o.id === mergeInto);
+    if (!target || !confirm(`Merge "${habit.name}" into "${target.name}"? All ticks move over and "${habit.name}" disappears. Challenges it counted for will count "${target.name}" instead.`)) return;
+    const { error } = await supabase().rpc("merge_habits", { p_from: habit.id, p_into: target.id });
+    if (error) return setErr(error.message);
+    toast({ text: <>Merged into <b>{target.name}</b>.</> });
+    router.replace(`/habits/${target.id}`);
   }
 
   async function remove() {
@@ -172,6 +185,26 @@ export function HabitForm({ habit }: { habit?: Habit }) {
             <Icon name="archive" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{habit.archived_at ? "Restore habit" : "Archive habit"}</div>
               <div className="muted" style={{ fontSize: 12 }}>Hide it from Today, keep your history</div></div>
           </button>
+          {others.length > 0 && (
+            <div>
+              <button className="row" onClick={() => setMergeOpen((v) => !v)} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
+                <Icon name="repeat" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Merge with another habit</div>
+                  <div className="muted" style={{ fontSize: 12 }}>For duplicates. Keeps all ticks from both</div></div>
+              </button>
+              {mergeOpen && (
+                <div style={{ display: "flex", gap: 8, padding: "0 16px 14px" }}>
+                  <label className="field" style={{ flex: 1, minHeight: 44 }}>
+                    <select value={mergeInto} onChange={(e) => setMergeInto(e.target.value)} aria-label="Merge into"
+                      style={{ border: 0, background: "none", width: "100%", fontSize: 14.5, fontWeight: 700, outline: 0, color: "var(--ink)" }}>
+                      <option value="">Merge into…</option>
+                      {others.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                    </select>
+                  </label>
+                  <button className="btn btn-primary btn-sm" disabled={!mergeInto} onClick={merge}>Merge</button>
+                </div>
+              )}
+            </div>
+          )}
           <button className="row" onClick={remove} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
             <Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Delete habit</div>
               <div className="muted" style={{ fontSize: 12 }}>Removes its history. Can't be undone.</div></div>

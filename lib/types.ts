@@ -22,6 +22,7 @@ export interface Habit {
   visibility: "private" | "friends";
   archived_at: string | null;
   starts_on: string | null;
+  from_challenge: string | null; // set when the habit was made for a challenge
   created_at: string;
 }
 

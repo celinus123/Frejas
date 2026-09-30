@@ -87,7 +87,7 @@ export async function ensureHabit(c: Challenge, m: Member, uid: string): Promise
   const times = c.same_goal ? c.times_per_week : m.times_per_week ?? c.times_per_week;
   const { data, error } = await sb().from("habits").insert({
     owner_id: uid, name: c.name.slice(0, 60), frequency: c.frequency, days: c.frequency === "specific_days" ? c.days : null,
-    times_per_week: c.frequency === "times_per_week" ? times : null, starts_on: c.starts_on,
+    times_per_week: c.frequency === "times_per_week" ? times : null, starts_on: c.starts_on, from_challenge: c.id,
   }).select("id").single();
   if (error || !data) return null;
   await sb().from("challenge_members").update({ habit_id: data.id }).eq("challenge_id", c.id).eq("user_id", uid);
