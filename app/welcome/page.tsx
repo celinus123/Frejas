@@ -7,6 +7,10 @@ import { Avatars } from "@/components/ui";
 import { useApp } from "@/components/AppProvider";
 import { uploadAvatar } from "@/lib/photos";
 import { FrejasLockup } from "@/components/Logo";
+import { isNative } from "@/lib/native";
+
+// App Store and Google Play reviewers can't receive our email codes, so this one account signs in with a password.
+const REVIEW_EMAIL = "review@frejas.app";
 
 type Step = "start" | "email" | "code" | "name";
 interface Invite { name: string; starts_on: string; ends_on: string; stake: string | null; member_names: string[] }
@@ -24,6 +28,7 @@ function Welcome() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
   const [resendIn, setResendIn] = useState(0);
   const [inv, setInv] = useState<Invite | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -58,7 +63,17 @@ function Welcome() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
+  const isReview = email.trim().toLowerCase() === REVIEW_EMAIL;
+
+  async function reviewSignIn() {
+    setBusy(true); setErr(null);
+    const { error } = await supabase().auth.signInWithPassword({ email: email.trim(), password });
+    setBusy(false);
+    if (error) setErr("That password doesn't match.");
+  }
+
   async function sendCode() {
+    if (isReview) return reviewSignIn();
     setBusy(true); setErr(null);
     const back = `${window.location.origin}/welcome${invite ? `?invite=${invite}` : friend ? `?friend=${friend}` : ""}`;
     const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: back } });
@@ -133,8 +148,13 @@ function Welcome() {
         <label className="field"><Icon name="mail" color="var(--ink-2)" />
           <input type="email" required autoFocus autoComplete="email" inputMode="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Email" />
         </label>
+        {isReview && (
+          <label className="field"><Icon name="lock" color="var(--ink-2)" />
+            <input type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Password" />
+          </label>
+        )}
         {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
-        <button className="btn btn-primary" disabled={busy || !/.+@.+\..+/.test(email)}>{busy ? "Sending…" : "Send code"}</button>
+        <button className="btn btn-primary" disabled={busy || !/.+@.+\..+/.test(email) || (isReview && !password)}>{busy ? (isReview ? "Signing in…" : "Sending…") : isReview ? "Sign in" : "Send code"}</button>
       </form>
       <p className="muted" style={{ textAlign: "center", fontSize: 12.5, margin: 0 }}>New here? The same code creates your account.</p>
     </>,
@@ -144,7 +164,7 @@ function Welcome() {
     <>
       <button className="icon-btn" aria-label="Back" onClick={() => setStep("email")}><Icon name="left" /></button>
       <h1 className="h1" style={{ fontSize: 30, marginTop: 12 }}>Check your inbox</h1>
-      <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, margin: 0 }}>We sent an email to <b style={{ color: "var(--ink)" }}>{email}</b>. Tap the link in it, or enter the 6-digit code.</p>
+      <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, margin: 0 }}>We sent an email to <b style={{ color: "var(--ink)" }}>{email}</b>. {isNative() ? "Enter the 6-digit code from it." : "Tap the link in it, or enter the 6-digit code."}</p>
       <label className="field" style={{ justifyContent: "center" }}>
         <input autoFocus inputMode="numeric" autoComplete="one-time-code" maxLength={6} aria-label="6-digit code" value={code}
           className="font-display" style={{ fontSize: 30, letterSpacing: 14, textAlign: "center" }} placeholder="······"

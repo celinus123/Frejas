@@ -2,6 +2,7 @@
 import { supabase } from "./supabase";
 import type { Challenge, CheckIn, Habit, HabitLog, Member } from "./types";
 import { today } from "./dates";
+import { nativeShare } from "./native";
 
 const sb = () => supabase();
 
@@ -139,9 +140,10 @@ export function inviteUrl(token: string) {
   return `${window.location.origin}/join/${token}`;
 }
 
-export async function shareLink(url: string, title: string): Promise<"shared" | "copied"> {
+export async function shareLink(url: string, title: string, text = `Join my challenge "${title}"`): Promise<"shared" | "copied"> {
+  if (await nativeShare({ title, text, url })) return "shared";
   if (navigator.share) {
-    try { await navigator.share({ title, text: `Join my challenge "${title}"`, url }); return "shared"; }
+    try { await navigator.share({ title, text, url }); return "shared"; }
     catch (e) { if ((e as Error).name === "AbortError") return "shared"; }
   }
   await navigator.clipboard.writeText(url);

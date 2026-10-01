@@ -71,3 +71,16 @@ npm run dev
 - The secret key is used only in `app/api/delete-account/route.ts`, on the server.
 - Photos live in private buckets and are served through links that expire after an hour.
 - `app/privacy` and `app/terms` are drafts — fill in the bracketed parts before inviting people outside your circle.
+
+## App Store and Google Play
+
+The iPhone and Android apps are a native shell (Capacitor 8) that loads https://frejas.app, so publishing to Vercel
+updates the apps too. Only changes to the shell itself (icons, permissions, new native plugins) need a new store build.
+
+- `capacitor.config.ts`: app id `app.frejas`, name, and the site it loads. `native-shell/` is the offline page.
+- `ios/`, `android/`: the native projects. Icons and splash screens come from `assets/` via `npx capacitor-assets generate`.
+- `codemagic.yaml`: cloud builds (no Mac needed) that upload to TestFlight and Google Play internal testing.
+- App reviewers sign in with `review@frejas.app` and a password (they can't receive our email codes).
+  Create that user in Supabase → Authentication → Users → Add user, with "Auto confirm" on.
+
+After changing native settings or adding a plugin: `npx cap sync`.

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frejas</title>
+<style>
+  :root { --bg: #ffffff; --ink: #2e0b19; --ink2: #75606a; --btn: #4a1230; --on: #ffffff; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1a0a11; --ink: #ffedf2; --ink2: #bfa9b2; --btn: #fcefd3; --on: #1a0a11; } }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, system-ui, sans-serif; }
+  main { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; box-sizing: border-box; text-align: center; }
+  h1 { font-family: Georgia, serif; font-size: 26px; margin: 8px 0 0; }
+  p { color: var(--ink2); margin: 0; max-width: 280px; line-height: 1.5; }
+  button { margin-top: 10px; height: 48px; padding: 0 28px; border: 0; border-radius: 24px; background: var(--btn); color: var(--on); font-size: 15px; font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+  <img src="icon.png" width="84" height="84" alt="" style="border-radius: 22px">
+  <h1>You're offline</h1>
+  <p>Frejas needs the internet to sync with your friends. Check your connection and try again.</p>
+  <button onclick="location.href='https://frejas.app'">Try again</button>
+</main>
+</body>
+</html>

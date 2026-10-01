@@ -85,7 +85,7 @@ export default function Feed() {
 
   async function shareFriendLink() {
     if (!profile) return;
-    const r = await shareLink(friendUrl(profile.friend_code), "Frejas").catch(() => "copied" as const);
+    const r = await shareLink(friendUrl(profile.friend_code), "Frejas", `${profile.display_name} wants to be friends on Frejas`).catch(() => "copied" as const);
     if (r === "copied") toast({ text: "Link copied. Send it to a friend." });
   }
   async function newLink() {

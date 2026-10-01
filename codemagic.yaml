@@ -1,0 +1,63 @@
+# Builds the Frejas apps in the cloud (no Mac needed) and uploads them to TestFlight and Google Play.
+# One-time setup in Codemagic is described in README.md under "App Store and Google Play".
+workflows:
+  ios-release:
+    name: iOS → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Frejas App Store Connect   # the name you give the API key in Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: app.frejas
+      vars:
+        APP_STORE_APPLE_ID: "0000000000"   # replace with the Apple ID of the app (App Store Connect → App Information)
+      node: 22
+      xcode: latest
+    scripts:
+      - name: Install
+        script: npm ci
+      - name: Copy web shell and plugins into the iOS project
+        script: npx cap sync ios
+      - name: Use signing profiles
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Set build number
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          cd ios/App && agvtool new-version -all $((LATEST + 1))
+      - name: Build
+        script: xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  android-release:
+    name: Android → Google Play (internal testing)
+    max_build_duration: 45
+    instance_type: linux_x2
+    environment:
+      android_signing:
+        - frejas_upload_key        # the keystore you upload in Codemagic
+      groups:
+        - google_play              # holds GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+      node: 22
+      java: 21
+    scripts:
+      - name: Install
+        script: npm ci
+      - name: Copy web shell and plugins into the Android project
+        script: npx cap sync android
+      - name: Build app bundle
+        script: |
+          LATEST=$(google-play get-latest-build-number --package-name app.frejas || echo 0)
+          cd android && ./gradlew bundleRelease -PversionCode=$((LATEST + 1))
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal

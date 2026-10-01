@@ -1,4 +1,5 @@
 "use client";
+import { syncStatusBar } from "@/lib/native";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -29,6 +30,7 @@ function applyTheme(t: Profile["theme"]) {
   if (t === "auto") el.removeAttribute("data-theme");
   else el.setAttribute("data-theme", t);
   try { localStorage.setItem("orbit-theme", t); } catch {}
+  syncStatusBar();
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -60,6 +62,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
     return () => sub.subscription.unsubscribe();
   }, [loadProfile]);
+
+  useEffect(() => {
+    syncStatusBar();
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    mq.addEventListener("change", syncStatusBar);
+    return () => mq.removeEventListener("change", syncStatusBar);
+  }, []);
 
   // When a new version is published, reload the next time the app comes back to the foreground
   // (a phone keeps a home-screen app open for days, so it would otherwise keep running old code).

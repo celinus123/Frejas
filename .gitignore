@@ -5,3 +5,9 @@ node_modules
 *.tsbuildinfo
 next-env.d.ts
 .vercel
+
+# native app signing keys never go in git
+*.keystore
+*.jks
+*.p12
+*.mobileprovision

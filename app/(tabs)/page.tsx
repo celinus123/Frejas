@@ -10,6 +10,7 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { CHALLENGES, CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
 import { similar } from "@/lib/similar";
+import { celebrate, tap } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 import { addDays, dayFraction, flexPeriod, formatLong, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
 import { isActive, loadChallenge, loadHabits, loadLogs, logHabit, myChallenges, unlogHabit, type MyChallenge } from "@/lib/data";
@@ -141,6 +142,8 @@ export default function Today() {
       try { await unlogHabit(existing.id); } catch { load(); }
       return;
     }
+    const allDone = scheduled.length > 0 && scheduled.every((x) => x.id === h.id || done.has(`${x.id}|${day}`));
+    if (allDone && isScheduledOn(h, day)) celebrate(); else tap();
     const temp: HabitLog = { id: `temp-${h.id}`, habit_id: h.id, user_id: userId, log_date: day };
     setLogs((ls) => [...ls, temp]);
     try {
