@@ -13,7 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { formatShort, today } from "@/lib/dates";
 import { invitePreview, loadHabits, type InvitePreview } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
-import { fmt, joinByLabel, joinClosed, scheduleLabel, winRuleLabel } from "@/lib/scoring";
+import { fmt, isFull, joinByLabel, joinClosed, placesLabel, scheduleLabel, winRuleLabel } from "@/lib/scoring";
 import type { Habit } from "@/lib/types";
 
 type Invite = InvitePreview;
@@ -102,6 +102,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
   const chip = (text: React.ReactNode) => <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: "var(--soft)" }}>{text}</span>;
   const first = inv.member_names[0] ?? "A friend";
   const closed = joinClosed(inv);
+  const full = isFull(inv);
 
   return (
     <main className="page" style={{ minHeight: "100dvh", paddingBottom: 30, gap: 14 }}>
@@ -119,6 +120,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
         </div>
         {inv.stake && <StakeLine stake={inv.stake} />}
         <MembersIn names={inv.member_names} count={inv.member_count} />
+        {placesLabel(inv) && <div className="t-text muted" style={{ display: "flex", alignItems: "center", gap: 6 }}><Icon name="users" size={15} />{placesLabel(inv)}{!full && inv.taken !== inv.member_count ? " (some are waiting for an answer)" : ""}</div>}
       </section>
 
       {closed && !requested ? (
@@ -128,6 +130,18 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
             <div>
               <div style={{ fontWeight: 800 }}>Joining has closed</div>
               <div style={{ fontSize: 13.5, marginTop: 2 }}>The last day to join was {formatShort(inv.join_by!)}. {first} can open it again from the challenge&apos;s menu.</div>
+            </div>
+          </div>
+          <div style={{ flex: 1 }} />
+          <Link href={session ? "/challenges" : "/"} className="btn btn-soft">{session ? "Go to my challenges" : "Go to Frejas"}</Link>
+        </>
+      ) : full && !requested ? (
+        <>
+          <div className="soft" style={{ padding: 18, borderRadius: 22, display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <Icon name="users" size={22} />
+            <div>
+              <div style={{ fontWeight: 800 }}>This challenge is full</div>
+              <div style={{ fontSize: 13.5, marginTop: 2 }}>It has room for {inv.max_members} people. {first} can make room from the challenge&apos;s menu.</div>
             </div>
           </div>
           <div style={{ flex: 1 }} />

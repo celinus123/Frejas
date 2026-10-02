@@ -10,13 +10,15 @@ import { Avatar, Avatars, Empty } from "@/components/ui";
 import { PageHead } from "@/components/PageHead";
 import { supabase } from "@/lib/supabase";
 import { invitePreview, loadChallenge, myChallenges, myDrafts, myInvitations, type Invitation, type InvitePreview, type MyChallenge } from "@/lib/data";
-import { daysLeft, fmt, isV2, joinClosed, joinLeft, ordinal, scheduleLabel, sharedTotal, standings, type Standing } from "@/lib/scoring";
+import { daysLeft, fmt, isFull, isV2, joinClosed, joinLeft, ordinal, placesLabel, scheduleLabel, sharedTotal, standings, type Standing } from "@/lib/scoring";
 import { diffDays, formatShort, today } from "@/lib/dates";
 import { forgetInvite, savedInvites } from "@/lib/savedInvites";
 import type { Challenge } from "@/lib/types";
 
 /** An invitation link you answered "Not now" to (remembered on this device). */
 type SavedLink = InvitePreview & { token: string };
+/** A challenge one of your friends runs and has opened for friends to find. */
+interface Found { challenge: Challenge; by: string; preview: InvitePreview | null; requested: boolean }
 
 interface Row extends MyChallenge {
   mine: Standing | null;
@@ -36,6 +38,7 @@ export default function Challenges() {
   const [showFinished, setShowFinished] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [links, setLinks] = useState<SavedLink[]>([]);
+  const [found, setFound] = useState<Found[]>([]);
   const t = today();
 
   const load = useCallback(async () => {
@@ -51,6 +54,21 @@ export default function Challenges() {
         return inv.some((x) => x.challenge.id === row.challenge_id) ? null : { ...row, token };
       }));
       setLinks(found.filter((x): x is SavedLink => !!x));
+
+      // challenges your friends have opened for friends: not the ones you're in, invited to, or too late for
+      const open = await supabase().from("challenges").select("*").eq("visibility", "friends").eq("status", "active").gte("ends_on", today()).limit(30);
+      const others = ((open.error ? [] : open.data ?? []) as Challenge[])
+        .filter((c) => c.creator_id !== userId && !mc.some((x) => x.challenge.id === c.id) && !inv.some((x) => x.challenge.id === c.id) && !joinClosed(c)).slice(0, 12);
+      if (others.length) {
+        const [names, reqs, previews] = await Promise.all([
+          supabase().from("profiles").select("id, display_name").in("id", [...new Set(others.map((c) => c.creator_id))]),
+          supabase().from("join_requests").select("challenge_id").eq("user_id", userId).in("challenge_id", others.map((c) => c.id)),
+          Promise.all(others.map((c) => invitePreview(c.invite_token).catch(() => null))),
+        ]);
+        const nameOf = new Map(((names.data ?? []) as { id: string; display_name: string }[]).map((p) => [p.id, p.display_name]));
+        const asked = new Set(((reqs.data ?? []) as { challenge_id: string }[]).map((r) => r.challenge_id));
+        setFound(others.map((c, i) => ({ challenge: c, by: nameOf.get(c.creator_id) ?? "A friend", preview: previews[i], requested: asked.has(c.id) })));
+      } else setFound([]);
       setRows(await Promise.all(mc.filter((x) => x.challenge.status !== "draft").map(async (x) => {
         const d = await loadChallenge(x.challenge.id);
         const st = standings(x.challenge, d.members, d.checkins);
@@ -90,7 +108,7 @@ export default function Challenges() {
   const active = rows.filter((r) => r.challenge.starts_on <= t && r.challenge.ends_on >= t);
   const upcoming = rows.filter((r) => r.challenge.starts_on > t).sort((a, b) => a.challenge.starts_on.localeCompare(b.challenge.starts_on));
   const finished = rows.filter((r) => r.challenge.ends_on < t).sort((a, b) => b.challenge.ends_on.localeCompare(a.challenge.ends_on));
-  const nothing = !rows.length && !drafts.length && !invites.length && !links.length;
+  const nothing = !rows.length && !drafts.length && !invites.length && !links.length && !found.length;
 
   // how long an invitation can still be accepted
   const joinTag = (c: { join_by?: string | null }) => joinLeft(c) && (
@@ -211,6 +229,34 @@ export default function Challenges() {
                   <span style={{ fontSize: 10.5, fontWeight: 800 }}>{n === 1 ? "day" : "days"}</span>
                 </div>
               </Link>
+            );
+          })}
+        </>
+      )}
+
+      {found.length > 0 && (
+        <>
+          <div className="label">From friends · {found.length}</div>
+          {found.map(({ challenge: c, by, preview, requested }) => {
+            const full = !!preview && isFull(preview);
+            return (
+              <div key={c.id} className="card" style={{ padding: 14, borderRadius: 24, display: "flex", flexDirection: "column", gap: 12 }}>
+                <Link href={`/join/${c.invite_token}`} style={{ display: "flex", gap: 12, alignItems: "center", color: "inherit", textDecoration: "none" }}>
+                  <Cover preset={c.cover_preset} width={56} height={56} radius={16} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5 }}><b>{by}</b>&apos;s challenge{preview?.member_count ? ` · ${preview.member_count} in it` : ""}</div>
+                    <div className="font-display" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{c.name}</div>
+                    <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{isV2(c) ? scheduleLabel(c) : "Challenge"} · {formatShort(c.starts_on)} – {formatShort(c.ends_on)}</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                      {joinTag(c)}
+                      {preview && placesLabel(preview) && <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, padding: "2px 9px", borderRadius: 999, background: "var(--soft)", fontSize: "var(--t-tag)", fontWeight: 800 }}><Icon name="users" size={12} />{placesLabel(preview)}</div>}
+                    </div>
+                  </div>
+                </Link>
+                {requested ? <div className="muted" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 800, padding: "0 2px" }}><Icon name="clock" size={15} />Request sent. {by} lets people in.</div>
+                  : full ? <div className="muted" style={{ fontSize: 13, fontWeight: 800, padding: "0 2px" }}>Full for now</div>
+                  : <Link href={`/join/${c.invite_token}`} className="btn btn-primary btn-sm"><Icon name="send" size={16} stroke={2.2} />Ask to join</Link>}
+              </div>
             );
           })}
         </>

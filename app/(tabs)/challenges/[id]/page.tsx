@@ -10,7 +10,7 @@ import { CheckInSheet } from "@/components/CheckInSheet";
 import { supabase } from "@/lib/supabase";
 import { addDays, diffDays, formatShort, parse, timeAgo, today, weekday } from "@/lib/dates";
 import { alignHabitStart, backfillCheckins, ensureHabit, inviteUrl, loadChallenge, myFriends, shareLink } from "@/lib/data";
-import { daysLeft, fmt, isV2, joinByLabel, joinClosed, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing, type WeekResult } from "@/lib/scoring";
+import { MAX_CHOICES, daysLeft, fmt, isV2, joinByLabel, joinClosed, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing, type WeekResult } from "@/lib/scoring";
 import { PostSheet, type Who } from "@/components/FeedPost";
 import { StakeLine } from "@/components/Stake";
 import { MembersIn } from "@/components/MembersIn";
@@ -62,7 +62,10 @@ function ChallengePage({ id }: { id: string }) {
   const [newStart, setNewStart] = useState("");
   const [openCi, setOpenCi] = useState<string | null>(null);
   const [joinOpen, setJoinOpen] = useState(false);      // the "last day to join" sheet
-  const [newJoinBy, setNewJoinBy] = useState<string | null>(null);   // the check-in that is opened (photo, reactions, comments)
+  const [newJoinBy, setNewJoinBy] = useState<string | null>(null);
+  const [whoOpen, setWhoOpen] = useState(false);        // the "who can join" sheet
+  const [newFindable, setNewFindable] = useState(false);
+  const [newMax, setNewMax] = useState<number | null>(null);   // the check-in that is opened (photo, reactions, comments)
   const t = today();
 
   const load = useCallback(async () => {
@@ -90,7 +93,9 @@ function ChallengePage({ id }: { id: string }) {
   // drafts open in the editor; members without a habit get one so Today shows it
   useEffect(() => {
     if (c?.status === "draft" && c.creator_id === userId) router.replace(`/challenges/new?draft=${c.id}`);
-  }, [c, userId, router]);
+    // a friend's challenge you found under Challenges but aren't in: its page is the "ask to join" page
+    else if (c && data && !data.members.some((m) => m.user_id === userId) && !invited && c.visibility === "friends" && c.creator_id !== userId) router.replace(`/join/${c.invite_token}`);
+  }, [c, data, invited, userId, router]);
   useEffect(() => {
     if (!c || !me || !userId) return;
     if (!me.habit_id) { if (ensuring.current) return; ensuring.current = true; }
@@ -109,6 +114,7 @@ function ChallengePage({ id }: { id: string }) {
   if (!data) return <main className="page"><div className="skeleton" style={{ height: 220 }} /><div className="skeleton" style={{ height: 300 }} /></main>;
 
   if (c && !me && invited) return <InviteView c={c} onJoined={load} />;
+  if (c && !me && c.visibility === "friends" && c.creator_id !== userId) return <main className="page"><div className="skeleton" style={{ height: 220 }} /></main>;   // on its way to the "ask to join" page
   if (!c || !me) return (
     <main className="page">
       <button className="icon-btn" aria-label="Back" onClick={() => router.push("/challenges")}><Icon name="left" /></button>
@@ -174,6 +180,14 @@ function ChallengePage({ id }: { id: string }) {
     }
     setStartOpen(false); setMenu(false);
     toast({ text: <><b>{d > t ? "Starts" : "Started"} {formatShort(d)}.</b>{added ? ` ${added} ${added === 1 ? "day" : "days"} you'd already ticked ${added === 1 ? "is" : "are"} checked in.` : d < t ? " Tap a day in the week view to check in for it." : ""}</> });
+    load();
+  }
+  async function saveWho() {
+    const taken = data!.members.length + requests.length;
+    const { error } = await supabase().from("challenges").update({ visibility: newFindable ? "friends" : "invite", max_members: newMax, ...(newFindable ? { join_mode: "approve" } : {}) }).eq("id", c!.id);
+    if (error) { toast({ text: /visibility|max_members/.test(error.message) ? "This isn't switched on yet. Try again in a little while." : error.message }); return; }
+    setWhoOpen(false);
+    toast({ text: newMax && taken >= newMax ? <>Saved. It&apos;s full now: {taken} of {newMax} places are taken.</> : newFindable ? "Saved. Your friends can find it under Challenges and ask to join." : "Saved. Only people you invite can find it." });
     load();
   }
   async function saveJoinBy() {
@@ -494,6 +508,30 @@ function ChallengePage({ id }: { id: string }) {
             <Icon name="check" stroke={2.4} />{newStart && newStart < c!.starts_on ? `Start ${formatShort(newStart)} instead` : "Save"}
           </button>
         </Sheet>
+        <Sheet open={whoOpen} onClose={() => setWhoOpen(false)} label="Who can join">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="h1" style={{ fontSize: 22 }}>Who can join</div>
+            <button className="icon-btn" aria-label="Close" onClick={() => setWhoOpen(false)}><Icon name="x" /></button>
+          </div>
+          <div role="radiogroup" aria-label="Who can find it" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {([[false, "Only people I invite", "Nobody else sees that it exists."], [true, "All my friends", "They see it under Challenges and can ask to join. You say yes to each one."]] as const).map(([v, title, sub]) => (
+              <button key={title} role="radio" aria-checked={newFindable === v} onClick={() => { setNewFindable(v); if (v && newMax === null) setNewMax(20); }} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 16, border: 0, textAlign: "left", width: "100%", background: newFindable === v ? "var(--soft)" : "var(--surface)", boxShadow: newFindable === v ? "inset 0 0 0 2px var(--primary)" : "var(--shadow)" }}>
+                <span style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{newFindable === v && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--primary)" }} />}</span>
+                <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: 14.5, fontWeight: 800 }}>{title}</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)", marginTop: 2 }}>{sub}</span></span>
+              </button>
+            ))}
+          </div>
+          <div className="label">How many can join</div>
+          <div role="group" aria-label="How many can join" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="chip" aria-pressed={newMax === null} onClick={() => setNewMax(null)}>No limit</button>
+            {MAX_CHOICES.map((n) => <button key={n} className="chip" aria-pressed={newMax === n} onClick={() => setNewMax(n)}>{n} people</button>)}
+          </div>
+          <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
+            Now: {data!.members.length} in it{requests.length ? `, ${requests.length} waiting for your answer` : ""}. People who wait take up a place too.
+            {newFindable && c!.join_mode !== "approve" ? " Everyone who isn't invited will have to ask first, with the link too." : ""}
+          </div>
+          <button className="btn btn-primary" onClick={saveWho}><Icon name="check" stroke={2.4} />Save</button>
+        </Sheet>
         <Sheet open={joinOpen} onClose={() => setJoinOpen(false)} label="Last day to join">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="h1" style={{ fontSize: 22 }}>Last day to join</div>
@@ -530,6 +568,8 @@ function ChallengePage({ id }: { id: string }) {
             {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
             {isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewStart(c!.starts_on); setMenu(false); setStartOpen(true); }}>
               <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
+            {group && isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewFindable(c!.visibility === "friends"); setNewMax(c!.max_members ?? null); setMenu(false); setWhoOpen(true); }}>
+              <Icon name="users" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Who can join</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{c!.visibility === "friends" ? "All my friends can find it" : "Only people I invite"} · {c!.max_members ? `room for ${c!.max_members}` : "no limit"}</div></div></button>}
             {group && isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewJoinBy(c!.join_by ?? null); setMenu(false); setJoinOpen(true); }}>
               <Icon name="clock" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Last day to join</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{c!.join_by ? (joinClosed(c!) ? `Closed ${formatShort(c!.join_by)} · open it again` : `Until ${formatShort(c!.join_by)}`) : "Any time while it runs"}</div></div></button>}
             {group && isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={newLink}>

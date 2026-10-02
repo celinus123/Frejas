@@ -235,6 +235,7 @@ export interface InvitePreview {
   frequency: Challenge["frequency"]; days: number[] | null; times_per_week: number | null; min_amount: number | null;
   same_goal: boolean; win_rule: Challenge["win_rule"]; join_mode: Challenge["join_mode"]; cover_preset: Challenge["cover_preset"];
   join_by?: string | null;
+  visibility?: "invite" | "friends"; max_members?: number | null; taken?: number;   // taken = members + people waiting for an answer
 }
 export async function invitePreview(token: string): Promise<InvitePreview | null> {
   const r = await sb().rpc("invite_preview", { p_token: token });

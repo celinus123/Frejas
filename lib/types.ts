@@ -63,6 +63,8 @@ export interface Challenge {
   cover_preset: CoverPreset | null;
   cover_path: string | null;
   join_by?: string | null;   // last day to join; null = for as long as it runs (database change 011)
+  visibility?: "invite" | "friends";   // "friends" = the creator's friends find it under Challenges and can ask to join (013)
+  max_members?: number | null;         // how many it has room for, counting people waiting for an answer; null = no limit (013)
 }
 
 export type CoverPreset = "arches" | "waves" | "sun" | "dots" | "leaf" | "stripes";

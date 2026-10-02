@@ -50,6 +50,12 @@ export function joinLeft(c: HasJoinBy): string | null {
   return n < 0 ? "Joining closed" : n === 0 ? "Last day to join" : `${n} ${n === 1 ? "day" : "days"} left to join`;
 }
 
+// ---------------------------------------------------------------- how many it has room for
+type HasPlaces = { max_members?: number | null; taken?: number; member_count?: number };
+export const isFull = (c: HasPlaces) => !!c.max_members && (c.taken ?? c.member_count ?? 0) >= c.max_members;
+export const placesLabel = (c: HasPlaces) => (c.max_members ? (isFull(c) ? `Full · ${c.max_members} people` : `${c.taken ?? c.member_count ?? 0} of ${c.max_members} places taken`) : null);
+export const MAX_CHOICES = [5, 10, 20, 50] as const;
+
 export function fmt(n: number): string {
   return Number.isInteger(n) ? n.toLocaleString("en-GB") : n.toLocaleString("en-GB", { maximumFractionDigits: 1 });
 }

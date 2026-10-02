@@ -10,7 +10,7 @@ import { addDays, formatShort, iso, parse, startOfWeek, today } from "@/lib/date
 import { alignHabitStart, backfillCheckins, loadHabits, myFriends } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
 import { uploadCover } from "@/lib/photos";
-import { planWeeks, scheduleLabel } from "@/lib/scoring";
+import { MAX_CHOICES, planWeeks, scheduleLabel } from "@/lib/scoring";
 import { STAKE_EMOJIS, STAKE_MAX, joinStake, stakeParts } from "@/lib/stake";
 import type { Challenge, CoverPreset, Habit } from "@/lib/types";
 
@@ -104,6 +104,8 @@ function NewChallenge() {
   // last day to join: "auto" = the start day, but never less than three days from now
   const [joinPick, setJoinPick] = useState<"auto" | "start" | "soon" | "any" | "date">("auto");
   const [joinDate, setJoinDate] = useState("");
+  const [findable, setFindable] = useState(false);              // can all your friends find it and ask to join?
+  const [maxPeople, setMaxPeople] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [myHabits, setMyHabits] = useState<Habit[]>([]);
@@ -138,6 +140,7 @@ function NewChallenge() {
       setStart(c.starts_on < t ? t : c.starts_on); setDur("custom"); setCustomEnd(c.ends_on);
       setSameGoal(c.same_goal); setWin(c.win_rule); setStake(stakeParts(c.stake).text); setStakeEmoji(stakeParts(c.stake).emoji); setJoinMode(c.join_mode);
       if (c.join_by) { setJoinPick("date"); setJoinDate(c.join_by); } else if (!c.solo && c.join_by === null) setJoinPick("any");
+      setFindable(c.visibility === "friends"); setMaxPeople(c.max_members ?? null);
     });
   }, [draftId, t]);
 
@@ -146,7 +149,7 @@ function NewChallenge() {
     frequency: freq, days: freq === "specific_days" ? [...days].sort() : null, times_per_week: freq === "times_per_week" ? times : null,
     min_amount: unit ? minAmount : null, starts_on: start, ends_on: end, same_goal: sameGoal, win_rule: solo ? "finishers" : win,
     stake: solo ? null : joinStake(stakeEmoji, stake) || null, join_mode: joinMode, cover_preset: preset,
-    ...(solo ? {} : { join_by: joinBy }),
+    ...(solo ? {} : { join_by: joinBy, visibility: findable ? "friends" : "invite", max_members: maxPeople, ...(findable ? { join_mode: "approve" as const } : {}) }),
   });
 
   async function saveRow(status: "draft" | "active"): Promise<string> {
@@ -446,11 +449,27 @@ function NewChallenge() {
         </div>
       ) : <div className="muted" style={{ fontSize: 13.5, padding: "0 4px" }}>No friends on Frejas yet. You get a link to share as soon as the challenge is created.</div>}
       {friends.length > 0 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>Friends you tick get the invitation inside Frejas, under Challenges, and join with one tap. No link needed.</div>}
+      <div className="label">Who else can find it</div>
+      <div role="radiogroup" aria-label="Who else can find it" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <Radio title="Only people I invite" sub="Nobody else sees that it exists." on={!findable} onClick={() => setFindable(false)} />
+        <Radio title="All my friends" sub="They see it under Challenges and can ask to join. You say yes to each one." on={findable} onClick={() => { setFindable(true); if (maxPeople === null) setMaxPeople(20); }} />
+      </div>
+
       <div className="label">People who get the link</div>
       <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>You also get a link to send to anyone who isn&apos;t your friend on Frejas yet.</div>
-      <div role="radiogroup" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {findable ? <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>Because your friends can find it, everyone who isn&apos;t invited asks first, with the link too.</div> : (
+      <div role="radiogroup" aria-label="People who get the link" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <Radio title="Only people I approve" sub="Anyone else who opens the link asks to join, and you say yes." on={joinMode === "approve"} onClick={() => setJoinMode("approve")} />
         <Radio title="Anyone with the link" sub="Good for bigger groups, like a gym or a class." on={joinMode === "open"} onClick={() => setJoinMode("open")} />
+      </div>)}
+
+      <div className="label">How many can join</div>
+      <div role="group" aria-label="How many can join" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button className="chip" aria-pressed={maxPeople === null} onClick={() => setMaxPeople(null)}>No limit</button>
+        {MAX_CHOICES.map((n) => <button key={n} className="chip" aria-pressed={maxPeople === n} onClick={() => setMaxPeople(n)}>{n} people</button>)}
+      </div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
+        {maxPeople ? `You count as one. People waiting for your answer take up a place too, so you never get more requests than there is room for.` : "Anyone who is let in can join."}
       </div>
       <div className="label">Last day to join</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
