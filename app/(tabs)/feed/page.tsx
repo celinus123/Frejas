@@ -7,7 +7,7 @@ import { Avatar, Empty, Sheet } from "@/components/ui";
 import { PostCard, PostSheet, Tile, type FeedPost, type Who } from "@/components/FeedPost";
 import { PageHead } from "@/components/PageHead";
 import { supabase } from "@/lib/supabase";
-import { friendUrl, loadChallenge, loadFeed, loadHabits, myChallenges, myFriends, removeFriend, shareLink, type Friend, type MyChallenge } from "@/lib/data";
+import { friendUrl, habitsWithViewers, loadChallenge, loadFeed, loadHabits, myChallenges, myFriends, removeFriend, shareLink, type Friend, type MyChallenge } from "@/lib/data";
 import { challengeCards, friendDayCards, goalCards, recapCards, type FunCard, type Who as CardWho } from "@/lib/feedCards";
 import { addComment, loadDaySocial, loadPeople, noSocial, react, refKey, removeComment, type Person, type PostRef, type Social } from "@/lib/social";
 import { D, type Emoji } from "@/lib/design";
@@ -50,13 +50,15 @@ export default function Feed() {
 
     // friends' shared habits and their ticks (row security only returns what they share with you)
     const ids = fr.map((x) => x.id);
-    const fh = ids.length ? ((await supabase().from("habits").select("*").in("owner_id", ids).eq("visibility", "friends").is("archived_at", null)).data ?? []) as Habit[] : [];
+    // (no filter on how they are shared: the database only hands over habits you are allowed to see, whether they are for all friends or for chosen ones)
+    const fh = ids.length ? ((await supabase().from("habits").select("*").in("owner_id", ids).is("archived_at", null)).data ?? []) as Habit[] : [];
+    const chosen = await habitsWithViewers(mh.map((h) => h.id));   // your own habits that chosen friends see
     const fl = fh.length ? ((await supabase().from("habit_logs").select("habit_id, log_date, created_at").in("habit_id", fh.map((h) => h.id)).gte("log_date", addDays(t, -40))).data ?? []) as { habit_id: string; log_date: string; created_at: string }[] : [];
 
     // a habit that counts for a challenge already shows up as a check-in, so it isn't repeated as a habit tick
     const chIds = c.map((x) => x.challenge.id);
     const linked = new Set(chIds.length ? (((await supabase().from("challenge_members").select("habit_id").in("challenge_id", chIds)).data ?? []) as { habit_id: string | null }[]).map((r) => r.habit_id) : []);
-    const shared = [...mh.filter((h) => h.visibility === "friends"), ...fh].filter((h) => !linked.has(h.id));
+    const shared = [...mh.filter((h) => h.visibility === "friends" || chosen.has(h.id)), ...fh].filter((h) => !linked.has(h.id));
 
     const relevant = c.filter((x) => x.challenge.status !== "draft" && ((x.challenge.ends_on < t && x.challenge.ends_on >= addDays(t, -14)) || (x.challenge.starts_on <= t && x.challenge.ends_on >= t && !x.challenge.solo)));
     const cd = await Promise.all(relevant.map((x) => loadChallenge(x.challenge.id)));

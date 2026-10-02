@@ -7,7 +7,7 @@ import { Ring } from "@/components/Ring";
 import { BackBar } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { addDays, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
-import { loadHabits, loadLogs, logHabit, unlogHabit, unlogHabitOn } from "@/lib/data";
+import { habitViewers, loadHabits, loadLogs, logHabit, unlogHabit, unlogHabitOn } from "@/lib/data";
 import { habitFacts, habitInsights } from "@/lib/insights";
 import type { Habit, HabitLog } from "@/lib/types";
 
@@ -18,6 +18,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
   const [logs, setLogs] = useState<HabitLog[]>([]);
   const [month, setMonth] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const [linked, setLinked] = useState<{ id: string; name: string }[]>([]);
+  const [viewers, setViewers] = useState(0);   // how many chosen friends see it
   const [view, setView] = useState<"Week" | "Month">("Month");
   const [week, setWeek] = useState(() => startOfWeek(today()));
   const [mine, setMine] = useState<{ habits: Habit[]; logs: HabitLog[] }>({ habits: [], logs: [] });   // your other habits, to look for patterns
@@ -34,6 +35,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
     setLinked(((m.data ?? []) as unknown as { challenges: { id: string; name: string } | null }[]).flatMap((r) => (r.challenges ? [r.challenges] : [])));
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { habitViewers(id).then((v) => setViewers(v.length)).catch(() => {}); }, [id]);
   useEffect(() => {
     if (!userId) return;
     Promise.all([loadHabits(userId), loadLogs(userId, addDays(t, -91), t)]).then(([habits, l]) => setMine({ habits, logs: l })).catch(() => {});
@@ -90,7 +92,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
           <span className="tag">{frequencyLabel(habit)}</span>
           {habit.category && <span className="tag">{habit.category}</span>}
           <span className="tag" style={{ display: "flex", gap: 4, alignItems: "center", background: "var(--surface)", boxShadow: "var(--shadow)" }}>
-            <Icon name={habit.visibility === "friends" ? "users" : "lock"} size={13} />{habit.visibility === "friends" ? "Friends" : "Private"}
+            <Icon name={habit.visibility === "friends" ? "users" : viewers ? "user" : "lock"} size={13} />{habit.visibility === "friends" ? "Friends" : viewers ? `${viewers} ${viewers === 1 ? "friend" : "friends"}` : "Private"}
           </span>
           <span className="tag">Since {formatShort(habitStart(habit))}</span>
           {habit.linked_habit_id && mine.habits.find((h) => h.id === habit.linked_habit_id) && (

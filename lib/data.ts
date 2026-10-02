@@ -55,6 +55,27 @@ export async function unlogHabit(logId: string) {
   if (error) throw error;
 }
 
+// ---------------------------------------------------------------- a habit shown to chosen friends only
+// The habit itself stays "private"; the friends listed for it get to see it (database change 012).
+
+/** The friends a habit is shown to. Empty for "only me" and for "all friends". */
+export async function habitViewers(habitId: string): Promise<string[]> {
+  const { data, error } = await sb().from("habit_viewers").select("user_id").eq("habit_id", habitId);
+  return error ? [] : ((data ?? []) as { user_id: string }[]).map((r) => r.user_id);
+}
+export async function setHabitViewers(habitId: string, ids: string[]) {
+  const now = await habitViewers(habitId);
+  const add = ids.filter((i) => !now.includes(i)), gone = now.filter((i) => !ids.includes(i));
+  if (gone.length) { const { error } = await sb().from("habit_viewers").delete().eq("habit_id", habitId).in("user_id", gone); if (error) throw error; }
+  if (add.length) { const { error } = await sb().from("habit_viewers").insert(add.map((u) => ({ habit_id: habitId, user_id: u }))); if (error) throw error; }
+}
+/** Of your own habits: the ones that are shown to chosen friends. */
+export async function habitsWithViewers(habitIds: string[]): Promise<Set<string>> {
+  if (!habitIds.length) return new Set();
+  const { data, error } = await sb().from("habit_viewers").select("habit_id").in("habit_id", habitIds);
+  return new Set(error ? [] : ((data ?? []) as { habit_id: string }[]).map((r) => r.habit_id));
+}
+
 /** Removes the tick a habit has on a given day, if there is one. */
 export async function unlogHabitOn(habitId: string, date: string) {
   const { data } = await sb().from("habit_logs").select("id").eq("habit_id", habitId).eq("log_date", date).maybeSingle();

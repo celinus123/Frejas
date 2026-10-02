@@ -6,9 +6,9 @@ import { addDays, formatShort, frequencyLabel, habitStart, isScheduledOn, today 
 import type { Frequency, Habit } from "@/lib/types";
 import { useApp } from "./AppProvider";
 import { Icon } from "./Icon";
-import { Switch } from "./ui";
+import { Avatar, Switch } from "./ui";
 import { MAX_CATEGORIES, SUGGESTED_CATEGORIES, categoriesOf } from "./CategoryFilter";
-import { loadHabits, pairHabits, unpairHabit } from "@/lib/data";
+import { habitViewers, loadHabits, myFriends, pairHabits, setHabitViewers, unpairHabit, type Friend } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
 
 const FREQS: { v: Frequency; l: string }[] = [
@@ -27,7 +27,10 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [days, setDays] = useState<number[]>(habit?.days ?? [1, 3, 5]);
   const [times, setTimes] = useState(habit?.times_per_week ?? 3);
   const [category, setCategory] = useState<string | null>(habit?.category ?? null);
-  const [shared, setShared] = useState(habit ? habit.visibility === "friends" : !(profile?.new_habits_private ?? true));
+  // who can see it: only you, all your friends, or the friends you pick
+  const [audience, setAudience] = useState<"private" | "friends" | "chosen">(habit ? (habit.visibility === "friends" ? "friends" : "private") : (profile?.new_habits_private ?? true) ? "private" : "friends");
+  const [viewers, setViewers] = useState<Set<string>>(new Set());
+  const [friends, setFriends] = useState<Friend[]>([]);
   const t = today();
   const [start, setStart] = useState(habit ? habitStart(habit) : t);   // first day it counts; may be before today
   const [fill, setFill] = useState(true);                              // tick the days since then
@@ -47,6 +50,12 @@ export function HabitForm({ habit }: { habit?: Habit }) {
     if (!userId) return;
     loadHabits(userId).then((hs) => { const rest = hs.filter((h) => h.id !== habit?.id); setUsed(categoriesOf(rest)); setOthers(rest); }).catch(() => {});
   }, [userId, habit?.id]);
+
+  useEffect(() => {
+    if (!userId) return;
+    myFriends(userId).then(setFriends).catch(() => {});
+    if (habit) habitViewers(habit.id).then((v) => { if (v.length) { setViewers(new Set(v)); if (habit.visibility !== "friends") setAudience("chosen"); } }).catch(() => {});
+  }, [userId, habit]);
 
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const options = [...used, ...SUGGESTED_CATEGORIES.filter((c) => !used.some((u) => same(u, c)))];
@@ -82,23 +91,27 @@ export function HabitForm({ habit }: { habit?: Habit }) {
     if (!userId) return;
     if (!name.trim()) { setErr("Give the habit a name first."); nameRef.current?.focus(); return; }
     if (!valid) { setErr("Pick at least one day."); return; }
+    if (audience === "chosen" && viewers.size === 0) { setErr("Pick at least one friend, or choose Only me."); return; }
+    const seenBy = audience === "chosen" ? [...viewers] : [];
     setBusy(true); setErr(null);
     const row = {
       name: name.trim(), frequency: freq,
       days: freq === "specific_days" ? [...days].sort() : null,
       times_per_week: freq === "times_per_week" ? times : null,
-      category, visibility: shared ? "friends" : "private",
+      category, visibility: audience === "friends" ? "friends" : "private",
       ...(habit ? (start !== habitStart(habit) ? { starts_on: start } : {}) : { starts_on: start < t ? start : null }),
     };
     if (habit) {
       const { error } = await supabase().from("habits").update(row).eq("id", habit.id);
+      if (error) { setBusy(false); return setErr(error.message); }
+      try { await setHabitViewers(habit.id, seenBy); } catch (e) { setBusy(false); return setErr(`Saved, but the list of friends couldn't be updated: ${(e as Error).message}`); }
       setBusy(false);
-      if (error) return setErr(error.message);
       router.replace(`/habits/${habit.id}`);
       return;
     }
     const { data, error } = await supabase().from("habits").insert({ ...row, owner_id: userId }).select("id").single();
     if (error) { setBusy(false); return setErr(error.message); }
+    if (seenBy.length) await setHabitViewers(data.id, seenBy).catch(() => toast({ text: "The habit is saved as private: the list of friends couldn't be stored. Open it and try again." }));
     if (fill && backDays.length) {
       const { error: le } = await supabase().from("habit_logs").insert(backDays.map((d) => ({ habit_id: data.id, user_id: userId, log_date: d, created_at: new Date(`${d}T12:00:00`).toISOString() })));
       if (le) toast({ text: "Habit saved, but the earlier days couldn't be ticked. Fill them in on Today." });
@@ -244,14 +257,40 @@ export function HabitForm({ habit }: { habit?: Habit }) {
         : used.length >= MAX_CATEGORIES - 3 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{used.length} of {MAX_CATEGORIES} categories used.</div>}
 
       <div className="label">Who can see it</div>
-      <div className="card group">
-        <div className="row">
-          <Icon name={shared ? "users" : "lock"} color="var(--primary)" />
-          <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{shared ? "Friends" : "Private"}</div>
-            <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{shared ? "People in your challenges can see your check-ins" : "Only you"}</div></div>
-          <Switch on={shared} onChange={setShared} label="Visible to friends" />
-        </div>
+      <div className="card group" role="radiogroup" aria-label="Who can see it">
+        {([["private", "lock", "Only me", "Nobody else sees it"],
+           ["friends", "users", "All friends", "Everyone you share a challenge with or have added as a friend"],
+           ["chosen", "user", "Chosen friends", friends.length ? "Only the friends you pick below" : "Add a friend first, then you can pick who sees it"]] as const).map(([v, icon, title, sub]) => {
+          const off = v === "chosen" && !friends.length;
+          return (
+            <button key={v} role="radio" aria-checked={audience === v} disabled={off} onClick={() => { setAudience(v); setErr(null); }} className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left", opacity: off ? 0.5 : 1 }}>
+              <Icon name={icon} color="var(--primary)" />
+              <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{title}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{sub}</div></div>
+              <span style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{audience === v && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--primary)" }} />}</span>
+            </button>
+          );
+        })}
       </div>
+      {audience === "chosen" && friends.length > 0 && (
+        <>
+          <div className="card group">
+            {friends.map((f) => {
+              const on = viewers.has(f.id);
+              return (
+                <button key={f.id} role="checkbox" aria-checked={on} onClick={() => { setErr(null); setViewers((v) => { const n = new Set(v); if (on) n.delete(f.id); else n.add(f.id); return n; }); }}
+                  className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
+                  <Avatar name={f.display_name} path={f.avatar_path} size={34} />
+                  <div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>{f.display_name}</div>
+                  <span style={{ width: 26, height: 26, borderRadius: 9, border: on ? 0 : "2px solid var(--primary)", background: on ? "var(--primary)" : "none", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{on && <Icon name="check" size={15} stroke={2.6} />}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
+            {viewers.size ? `${viewers.size} ${viewers.size === 1 ? "friend sees" : "friends see"} this habit and when you tick it. Nobody else does.` : "Tick the friends who should see this habit."}
+          </div>
+        </>
+      )}
       <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Reminders are coming in a later version.</div>
 
       {habit && (
