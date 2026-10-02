@@ -27,7 +27,9 @@ export function FrejasWordmark({ height = 30, color = "var(--primary)" }: { heig
 export function FrejasLockup({ mark = 96, word = 30 }: { mark?: number; word?: number }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: Math.round(mark * 0.16) }}>
-      <FrejasMark size={mark} />
+      {/* The F is heavier on its left side (the stem), so centred by its box it looks off to the left.
+          It is nudged right by half the difference between its box centre and its centre of weight. */}
+      <div style={{ transform: "translateX(4.2%)" }}><FrejasMark size={mark} /></div>
       <FrejasWordmark height={word} />
     </div>
   );

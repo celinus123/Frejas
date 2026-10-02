@@ -5,6 +5,7 @@ import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { Avatar, Empty, Sheet } from "@/components/ui";
 import { PostCard, PostSheet, Tile, type FeedPost, type Who } from "@/components/FeedPost";
+import { PageHead } from "@/components/PageHead";
 import { supabase } from "@/lib/supabase";
 import { friendUrl, loadChallenge, loadFeed, loadHabits, myChallenges, myFriends, removeFriend, shareLink, type Friend, type MyChallenge } from "@/lib/data";
 import { challengeCards, friendDayCards, goalCards, recapCards, type FunCard, type Who as CardWho } from "@/lib/feedCards";
@@ -198,17 +199,17 @@ export default function Feed() {
 
   return (
     <main className="page" style={{ paddingLeft: 16, paddingRight: 16 }}>
-      <h1 className="h1" style={{ padding: "0 4px" }}>Feed</h1>
+      <PageHead title="Feed" pad={4} />
 
-      <div className="no-scrollbar" style={{ display: "flex", gap: 14, overflowX: "auto", margin: "0 -16px", padding: "4px 20px 2px" }} aria-label="Friends">
-        <button onClick={() => setAddOpen(true)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: 56 }}>
+      <div className="no-scrollbar" style={{ display: "flex", gap: D.avatar.friendGap, overflowX: "auto", margin: "0 -16px", padding: "4px 20px 2px" }} aria-label="Friends">
+        <button onClick={() => setAddOpen(true)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: D.avatar.friend + 6 }}>
           <span style={{ width: D.avatar.friend, height: D.avatar.friend, borderRadius: "50%", border: "2px dashed var(--primary-l)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="plus" size={20} stroke={2.2} /></span>
           <span className="t-meta" style={{ fontWeight: 700 }}>Add</span>
         </button>
         {friends.map((f) => (
-          <button key={f.id} onClick={() => setFriendSheet(f)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: 56, color: "inherit" }}>
+          <button key={f.id} onClick={() => setFriendSheet(f)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: D.avatar.friend + 6, color: "inherit" }}>
             <Avatar name={f.display_name} path={f.avatar_path} size={D.avatar.friend} />
-            <span className="t-meta" style={{ fontWeight: 700, maxWidth: 56, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.display_name.split(" ")[0]}</span>
+            <span className="t-meta" style={{ fontWeight: 700, maxWidth: D.avatar.friend + 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.display_name.split(" ")[0]}</span>
           </button>
         ))}
         {friends.length === 0 && <div className="muted" style={{ fontSize: 13, alignSelf: "center", lineHeight: 1.4, maxWidth: 220 }}>Add friends to see their check-ins and the habits they share.</div>}

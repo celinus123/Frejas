@@ -4,9 +4,13 @@ import { useApp } from "@/components/AppProvider";
 import { Flame, Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Sheet } from "@/components/ui";
+import { PageHead } from "@/components/PageHead";
 import { CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
 import { supabase } from "@/lib/supabase";
-import { addDays, bonusSessions, dayFraction, iso, flexPeriod, formatLong, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
+import Link from "next/link";
+import { addDays, bonusSessions, dayFraction, iso, formatLong, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
+import { habitRates } from "@/lib/insights";
+import { D } from "@/lib/design";
 import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
 
@@ -79,26 +83,40 @@ export default function Stats() {
   const stat = (icon: React.ReactNode, v: React.ReactNode, l: string) => (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>{icon}<div><div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>{v}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{l}</div></div></div>
   );
-  const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= t);
+  // what goes best, and what to catch up on, in the period you're looking at
+  const rates = habitRates(habits, logs, from, to, t);
+  const best = [...rates].filter((r) => r.rate >= 0.5).sort((a, b) => b.rate - a.rate || b.done - a.done).slice(0, 3);
+  const behind = [...rates].filter((r) => r.rate < 0.6 && !best.includes(r)).sort((a, b) => a.rate - b.rate || b.due - a.due).slice(0, 2);
+  const rateRow = (r: (typeof rates)[number], i?: number) => (
+    <Link key={r.habit.id} href={`/habits/${r.habit.id}`} className="row" style={{ color: "inherit", textDecoration: "none" }}>
+      {i !== undefined && <span className="muted" style={{ width: 14, fontSize: "var(--t-title)", fontWeight: 800 }}>{i + 1}</span>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "var(--t-title)", fontWeight: 700 }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.habit.name}</span>
+          {chIds.has(r.habit.id) && <Icon name="trophy" size={D.icon.inline} color="var(--primary)" />}
+        </div>
+        <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{r.label}</div>
+      </div>
+      <Ring size={42} stroke={4.5} pct={r.rate * 100}><span className="ring-num" style={{ fontSize: 10.5 }}>{Math.round(r.rate * 100)}%</span></Ring>
+    </Link>
+  );
   const scheduledHabits = habits.filter((h) => !isFlexible(h));
   const weekDays = period === "Week" ? range(from, to) : [];
 
   return (
     <main className="page">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 className="h1">Stats</h1>
-        <div className="seg" style={{ padding: 3 }}>
-          {(["Week", "Month", "Year"] as Period[]).map((p) => (
-            <button key={p} aria-pressed={period === p} onClick={() => { setPeriod(p); setAnchor(t); }} style={{ height: 32, flex: "none", padding: "0 12px" }}>{p}</button>
-          ))}
-        </div>
+      <PageHead title="Stats" />
+      <div className="seg">
+        {(["Week", "Month", "Year"] as Period[]).map((p) => (
+          <button key={p} aria-pressed={period === p} onClick={() => { setPeriod(p); setAnchor(t); }}>{p}</button>
+        ))}
       </div>
 
       <CategoryFilter categories={cats} value={cat} onChange={setCat} challenges={allHabits.some((h) => chIds.has(h.id))} />
 
       <section className="card" style={{ padding: 18, display: "flex", alignItems: "center", gap: 20 }}>
         <Ring size={108} stroke={11} pct={pct}>
-          <span className="font-display" style={{ fontSize: 27, fontWeight: 600 }}>{pct}%</span><span className="muted" style={{ fontSize: 11.5 }}>of goal</span>
+          <span className="font-display ring-num" style={{ fontSize: 27, fontWeight: 600 }}>{pct}%</span><span className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>of goal</span>
         </Ring>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {stat(tile("var(--accent-bg)", <Flame size={20} />), streak, "day streak")}
@@ -174,24 +192,19 @@ export default function Stats() {
         </section>
       )}
 
-      {flexible.length > 0 && period !== "Year" && (
+      {best.length > 0 && rates.length > 1 && (
         <>
-          <h2 className="h2">Flexible habits</h2>
-          <section className="card group">
-            {flexible.map((h) => {
-              const p = flexPeriod(h, to < t ? to : t);
-              const c = logs.filter((l) => l.habit_id === h.id && l.log_date >= p.from && l.log_date <= p.to).length;
-              return (
-                <div key={h.id} className="row">
-                  <div style={{ flex: 1 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{h.name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{frequencyLabel(h)} · {p.label.toLowerCase()}</div></div>
-                  {c > p.target && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{c - p.target} bonus</span>}
-                  <Ring size={40} stroke={4} pct={(Math.min(c, p.target) / p.target) * 100}><span style={{ fontSize: 11, fontWeight: 800 }}>{Math.min(c, p.target)}/{p.target}</span></Ring>
-                </div>
-              );
-            })}
-          </section>
+          <h2 className="h2" style={{ marginTop: 6 }}>Going best</h2>
+          <section className="card group">{best.map((r, i) => rateRow(r, i))}</section>
         </>
       )}
+      {behind.length > 0 && (
+        <>
+          <h2 className="h2" style={{ marginTop: 6 }}>Worth catching up on</h2>
+          <section className="card group">{behind.map((r) => rateRow(r))}</section>
+        </>
+      )}
+      {[...best, ...behind].some((r) => chIds.has(r.habit.id)) && rates.length > 1 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>A trophy marks a habit that counts for a challenge.</div>}
 
       <Sheet open={!!daySheet} onClose={() => setDaySheet(null)} label="Day">
         {daySheet && (() => {

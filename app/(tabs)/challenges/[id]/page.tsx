@@ -9,8 +9,13 @@ import { Cover } from "@/components/Cover";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { supabase } from "@/lib/supabase";
 import { addDays, diffDays, formatShort, parse, timeAgo, today, weekday } from "@/lib/dates";
-import { alignHabitStart, backfillCheckins, ensureHabit, inviteUrl, loadChallenge, myFriends, shareLink, toggleLike } from "@/lib/data";
-import { daysLeft, fmt, isV2, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing } from "@/lib/scoring";
+import { alignHabitStart, backfillCheckins, ensureHabit, inviteUrl, loadChallenge, myFriends, shareLink } from "@/lib/data";
+import { daysLeft, fmt, isV2, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing, type WeekResult } from "@/lib/scoring";
+import { PostSheet, type Who } from "@/components/FeedPost";
+import { StakeLine } from "@/components/Stake";
+import { MembersIn } from "@/components/MembersIn";
+import { addComment, react, removeComment, summary, type Social } from "@/lib/social";
+import { D, type Emoji } from "@/lib/design";
 import { signedUrls } from "@/lib/photos";
 import type { Challenge, CheckIn, Member, Message } from "@/lib/types";
 
@@ -55,6 +60,7 @@ function ChallengePage({ id }: { id: string }) {
   const [invited, setInvited] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [newStart, setNewStart] = useState("");
+  const [openCi, setOpenCi] = useState<string | null>(null);   // the check-in that is opened (photo, reactions, comments)
   const t = today();
 
   const load = useCallback(async () => {
@@ -123,13 +129,24 @@ function ChallengePage({ id }: { id: string }) {
   const thisWeek = weeks[wi];
 
   async function share() {
+    await toGroup();
     const r = await shareLink(url, c!.name);
     if (r === "copied") toast({ text: "Link copied. Paste it in your group chat." });
   }
-  async function makeGroup() {
+  // "Make it a group challenge" only opens the invitation. The challenge becomes a group challenge
+  // when you actually invite someone or share the link, so changing your mind leaves everything as it was.
+  async function toGroup() {
+    if (!c!.solo) return;
     await supabase().from("challenges").update({ solo: false }).eq("id", c!.id);
     await load();
-    setShareOpen(true);
+  }
+  async function toSolo() {
+    await supabase().from("challenge_invites").delete().eq("challenge_id", c!.id).eq("invited_by", userId!);
+    const { error } = await supabase().from("challenges").update({ solo: true }).eq("id", c!.id);
+    if (error) { toast({ text: error.message }); return; }
+    setMenu(false); setTab("Overview");
+    toast({ text: "It's just you again. Your progress is kept." });
+    load();
   }
   async function startToday() {
     await supabase().from("challenges").update({ starts_on: t }).eq("id", c!.id);
@@ -142,7 +159,8 @@ function ChallengePage({ id }: { id: string }) {
   const maxStart = firstCheckin && firstCheckin < c.ends_on ? firstCheckin : c.ends_on;
   async function changeStart() {
     const d = newStart;
-    if (!d || d === c!.starts_on || d > maxStart) return;
+    if (!d || d === c!.starts_on) { setStartOpen(false); return; }
+    if (d > maxStart) return;
     const { error } = await supabase().from("challenges").update({ starts_on: d }).eq("id", c!.id);
     if (error) { toast({ text: error.message }); return; }
     let added = 0;
@@ -180,10 +198,32 @@ function ChallengePage({ id }: { id: string }) {
     toast({ text: ok ? `${r.profiles?.display_name ?? "They"} joined.` : "Request declined." });
     load();
   }
-  async function like(ci: CheckIn) {
-    const liked = !!ci.reactions?.some((r) => r.user_id === userId);
-    setData((d) => d && { ...d, checkins: d.checkins.map((x) => x.id === ci.id ? { ...x, reactions: liked ? x.reactions?.filter((r) => r.user_id !== userId) : [...(x.reactions ?? []), { user_id: userId! }] } : x) });
-    await toggleLike(ci.id, userId!, liked);
+  // reactions and comments on a check-in work the same way here as in the feed
+  const socialOf = (ci: CheckIn): Social => ({
+    reactions: (ci.reactions ?? []).map((r) => ({ user_id: r.user_id, emoji: r.emoji ?? "❤️" })),
+    comments: [...(ci.comments ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+  });
+  const patchCi = (cid: string, fn: (x: CheckIn) => CheckIn) => setData((d) => d && { ...d, checkins: d.checkins.map((x) => (x.id === cid ? fn(x) : x)) });
+  const who: Who = (uid) => {
+    const p = data.members.find((m) => m.user_id === uid)?.profiles;
+    return { name: p?.display_name ?? "Former member", path: p?.avatar_path ?? null, you: uid === userId };
+  };
+  async function onReact(ci: CheckIn, emoji: Emoji | null) {
+    const had = !!ci.reactions?.some((r) => r.user_id === userId);
+    const before = ci.reactions;
+    patchCi(ci.id, (x) => ({ ...x, reactions: [...(x.reactions ?? []).filter((r) => r.user_id !== userId), ...(emoji ? [{ user_id: userId!, emoji }] : [])] }));
+    try { await react({ kind: "checkin", id: ci.id }, userId!, emoji, had); }
+    catch { patchCi(ci.id, (x) => ({ ...x, reactions: before })); toast({ text: "Couldn't save your reaction. Try again." }); }
+  }
+  async function onComment(ci: CheckIn, body: string) {
+    const made = await addComment({ kind: "checkin", id: ci.id }, userId!, body);
+    patchCi(ci.id, (x) => ({ ...x, comments: [...(x.comments ?? []), made] }));
+  }
+  async function onDeleteComment(ci: CheckIn, commentId: string) {
+    const before = ci.comments;
+    patchCi(ci.id, (x) => ({ ...x, comments: (x.comments ?? []).filter((m) => m.id !== commentId) }));
+    try { await removeComment({ kind: "checkin", id: ci.id }, commentId); }
+    catch { patchCi(ci.id, (x) => ({ ...x, comments: before })); toast({ text: "Couldn't delete the comment." }); }
   }
 
   const schedule = isV2(c) ? scheduleLabel(c, me.times_per_week, me.goal_amount) : mine?.goalLabel ?? "";
@@ -212,7 +252,7 @@ function ChallengePage({ id }: { id: string }) {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {schedule && <Chip>{schedule}</Chip>}<Chip>{timeChip}</Chip>{group && isV2(c) && <Chip>{winRuleLabel(c.win_rule)}</Chip>}
         </div>
-        {c.stake && group && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 16, background: "var(--accent-bg)", fontSize: 13, fontWeight: 700 }}><Icon name="coffee" size={18} color="var(--accent)" />{c.stake}</div>}
+        {c.stake && group && <StakeLine stake={c.stake} />}
       </section>
     </>
   );
@@ -226,7 +266,7 @@ function ChallengePage({ id }: { id: string }) {
         <Countdown to={c.starts_on} />
         <div className="muted" style={{ fontSize: 13 }}>Starts {parse(c.starts_on).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })} · {Math.ceil(totalDays(c) / 7)} weeks</div>
       </section>
-      <button className="soft" onClick={() => (group ? setShareOpen(true) : makeGroup())} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 24, border: 0, textAlign: "left" }}>
+      <button className="soft" onClick={() => setInviteOpen(true)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 24, border: 0, textAlign: "left" }}>
         <span style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="users" /></span>
         <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>{group ? "Invite more friends" : "Bring a friend"}</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>Invite someone before it starts</span></span>
         <Icon name="right" size={16} />
@@ -239,7 +279,7 @@ function ChallengePage({ id }: { id: string }) {
   // ---------------------------------------------------------------- shared pieces
   const progressCard = mine && (
     <section className="card" style={{ padding: "14px 16px", display: "flex", alignItems: "center", gap: 16 }}>
-      <Ring size={76} stroke={8} pct={mine.progress}><span style={{ fontSize: 16, fontWeight: 800 }}>{mine.progress}%</span></Ring>
+      <Ring size={76} stroke={8} pct={mine.progress}><span className="ring-num" style={{ fontSize: 16 }}>{mine.progress}%</span></Ring>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <span style={{ fontSize: 16, fontWeight: 800 }}>{isV2(c) ? `${mine.done} of ${mine.target} sessions` : group ? `You're ${ordinal(myIdx + 1)}` : `${mine.done} days`}</span>
@@ -286,35 +326,35 @@ function ChallengePage({ id }: { id: string }) {
     </section>
   );
 
-  const weeksCard = weeks.length > 1 && (
-    <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>Week by week</span><span className="muted" style={{ fontSize: "var(--t-sub)" }}>sessions per week</span></div>
-      <div style={{ display: "flex", gap: 4 }}>
-        {weeks.map((w, i) => {
-          const full = w.done >= w.target && !w.isFuture;
-          return <div key={i} title={`${formatShort(w.from)}: ${w.done}/${w.target}`} role={w.isFuture ? undefined : "button"} onClick={() => !w.isFuture && setWeekIdx(i)} style={{ cursor: w.isFuture ? "default" : "pointer", flex: 1, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800,
-            background: full ? "var(--primary)" : w.done ? "var(--primary-l)" : "var(--soft-l)", color: full ? "var(--on-primary)" : "var(--ink)", outline: w.isCurrent ? "2px solid var(--primary)" : "none", outlineOffset: 1 }}>{w.isFuture ? "" : w.done}</div>;
-        })}
-      </div>
-    </section>
-  );
-
+  // A check-in in the list: who and what on the left, the photo filling the right side, reactions and comments along the bottom.
   const latest = (list: CheckIn[]) => list.slice(0, 30).map((ci) => {
-    const liked = !!ci.reactions?.some((r) => r.user_id === userId);
     const mineCi = ci.user_id === userId;
+    const soc = socialOf(ci);
+    const sum = summary(soc);
+    const reacted = soc.reactions.some((r) => r.user_id === userId);
+    const photo = ci.photo_path ? photos[ci.photo_path] : undefined;
     return (
-      <div key={ci.id} className="card" style={{ padding: "10px 12px", borderRadius: 20, display: "flex", gap: 12, alignItems: "center" }}>
-        <Avatar name={ci.profiles?.display_name ?? ""} path={ci.profiles?.avatar_path} size={36} />
-        <button onClick={() => mineCi && setCheckin({ existing: ci })} style={{ flex: 1, border: 0, background: "none", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2, cursor: mineCi ? "pointer" : "default" }}>
-          <span className="muted" style={{ fontSize: "var(--t-sub)" }}><b style={{ color: "var(--ink)" }}>{mineCi ? "You" : ci.profiles?.display_name}</b> · {ci.checkin_date === t ? timeAgo(ci.created_at) : formatShort(ci.checkin_date)}</span>
-          <span style={{ fontSize: 14.5, fontWeight: 700 }}>{ci.title}{ci.amount ? ` · ${fmt(ci.amount)} ${c.unit ?? ""}` : ""}</span>
-          {ci.comment && <span className="muted" style={{ fontSize: "var(--t-sub)" }}>{ci.comment}</span>}
-        </button>
-        {ci.photo_path && photos[ci.photo_path] && <img src={photos[ci.photo_path]} alt="" style={{ width: 52, height: 52, borderRadius: 14, objectFit: "cover" }} />}
-        {group && <button aria-label={liked ? "Unlike" : "Like"} aria-pressed={liked} onClick={() => like(ci)} style={{ border: 0, background: "none", display: "flex", alignItems: "center", gap: 3, fontSize: 12.5, fontWeight: 700, color: "var(--ink-2)", padding: 4 }}>
-          <Icon name="heart" size={17} color={liked ? "var(--accent)" : "currentColor"} fill={liked ? "var(--flame-fill)" : "none"} />{ci.reactions?.length || ""}
-        </button>}
-      </div>
+      <article key={ci.id} className="card ci-card">
+        <div className="ci-main">
+          <div className="who">
+            <Avatar name={ci.profiles?.display_name ?? ""} path={ci.profiles?.avatar_path} size={30} />
+            <b>{mineCi ? "You" : ci.profiles?.display_name}</b><span>{ci.checkin_date === t ? timeAgo(ci.created_at) : formatShort(ci.checkin_date)}</span>
+            {mineCi && !finished && <button onClick={() => setCheckin({ existing: ci })} aria-label="Edit check-in" className="muted" style={{ marginLeft: "auto", border: 0, background: "none", padding: 6, margin: "-6px -6px -6px auto" }}><Icon name="edit" size={D.icon.action} /></button>}
+          </div>
+          <button onClick={() => setOpenCi(ci.id)} aria-label={`Open ${ci.title}`} style={{ border: 0, background: "none", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2, color: "inherit" }}>
+            <span className="t-title">{ci.title}{ci.amount ? ` · ${fmt(ci.amount)} ${c.unit ?? ""}` : ""}</span>
+            {ci.comment && <span className="t-sub">{ci.comment}</span>}
+          </button>
+          {group && (
+            <div className="acts" style={{ marginTop: "auto", paddingTop: 4 }}>
+              <button className={reacted ? "rbtn mine" : "rbtn"} aria-pressed={reacted} aria-label={reacted ? "Remove your reaction" : "React with a heart"} onClick={() => onReact(ci, reacted ? null : "❤️")}><Icon name="heart" size={D.icon.action} /></button>
+              {sum.total > 0 && <span className="sum" aria-label={`${sum.total} ${sum.total === 1 ? "reaction" : "reactions"}`}>{sum.emojis.slice(0, 3).map((x) => <i key={x.e} className="em">{x.e}</i>)}</span>}
+              <button className="cbtn" onClick={() => setOpenCi(ci.id)} aria-label={soc.comments.length ? `${soc.comments.length} comments. Open` : "Write a comment"}><Icon name="comment" size={D.icon.action} />{soc.comments.length || ""}</button>
+            </div>
+          )}
+        </div>
+        {photo && <button className="ci-photo" onClick={() => setOpenCi(ci.id)} aria-label={`Open photo: ${ci.title}`}><img src={photo} alt="" /></button>}
+      </article>
     );
   });
 
@@ -329,33 +369,46 @@ function ChallengePage({ id }: { id: string }) {
     </section>
   );
 
-  const checkInBtn = !finished && <button className="btn btn-primary" onClick={() => setCheckin({})}><Icon name="check" stroke={2.4} />Check in</button>;
+  // the most used button on the page: straight under the title box, in raspberry
+  const checkInBtn = !finished && <button className="btn btn-accent" onClick={() => setCheckin({})}><Icon name="check" stroke={2.4} />Check in</button>;
+  const tabs: Tab[] = group ? ["Overview", "Leaderboard", "Stats", "Chat"] : ["Overview", "Stats"];
+  const shownTab: Tab = tabs.includes(tab) ? tab : "Overview";
+  const tabBar = (
+    <div className="no-scrollbar" role="group" aria-label="Sections" style={{ display: "flex", gap: 8, overflowX: "auto", margin: "0 -20px", padding: "2px 20px 4px" }}>
+      {tabs.map((x) => <button key={x} className="chip" aria-pressed={shownTab === x} onClick={() => setTab(x)}>{x}</button>)}
+    </div>
+  );
 
   // ---------------------------------------------------------------- just me
   if (!group) return (
     <main className="page">
       {hero}
-      {result}
-      {progressCard}
-      {!finished && weekCard}
-      {weeksCard}
-      {!finished && (
-        <button className="soft" onClick={makeGroup} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 24, border: 0, textAlign: "left" }}>
-          <span style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="users" /></span>
-          <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>Make it a group challenge</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>Invite friends. Your progress so far is kept.</span></span>
-          <Icon name="right" size={16} />
-        </button>
-      )}
       {checkInBtn}
-      {myCheckins.length > 0 && <><div className="label">Your check-ins</div>{latest(myCheckins)}</>}
+      {tabBar}
+      {shownTab === "Stats" ? mine && <SoloStats c={c} mine={mine} weeks={weeks} checkins={myCheckins} /> : (
+        <>
+          {result}
+          {progressCard}
+          {!finished && weekCard}
+          {!finished && (
+            <button className="soft" onClick={() => setInviteOpen(true)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 24, border: 0, textAlign: "left" }}>
+              <span style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="users" /></span>
+              <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>Make it a group challenge</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>Invite friends. Your progress so far is kept.</span></span>
+              <Icon name="right" size={16} />
+            </button>
+          )}
+          {myCheckins.length > 0 && <><h2 className="h2" style={{ marginTop: 14 }}>Your check-ins</h2>{latest(myCheckins)}</>}
+        </>
+      )}
       {sheets()}
     </main>
   );
 
   // ---------------------------------------------------------------- with friends
   return (
-    <main className="page" style={tab === "Chat" ? { paddingBottom: 170 } : undefined}>
+    <main className="page" style={shownTab === "Chat" ? { paddingBottom: 170 } : undefined}>
       {hero}
+      {checkInBtn}
       {isCreator && requests.map((r) => (
         <section key={r.user_id} className="card" style={{ padding: "12px 14px", display: "flex", alignItems: "center", gap: 10 }}>
           <Avatar name={r.profiles?.display_name ?? "?"} path={r.profiles?.avatar_path} size={36} />
@@ -364,22 +417,21 @@ function ChallengePage({ id }: { id: string }) {
           <button aria-label="Decline" onClick={() => approve(r, false)} style={{ width: 36, height: 36, borderRadius: "50%", border: 0, background: "var(--soft)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="x" size={16} /></button>
         </section>
       ))}
-      <div className="seg">{(["Overview", "Leaderboard", "Stats", "Chat"] as Tab[]).map((x) => <button key={x} aria-pressed={tab === x} onClick={() => setTab(x)} style={{ padding: 0 }}>{x}</button>)}</div>
+      {tabBar}
 
-      {tab === "Overview" && (
+      {shownTab === "Overview" && (
         <>
           {result}
           {progressCard}
           {!finished && weekCard}
-          {checkInBtn}
           <h2 className="h2" style={{ marginTop: 14 }}>Latest</h2>
           {data.checkins.length === 0 && <div className="muted" style={{ fontSize: 14, padding: "0 4px" }}>No check-ins yet. Be the first!</div>}
           {latest(data.checkins)}
         </>
       )}
-      {tab === "Leaderboard" && <Leaderboard c={c} st={st} userId={userId!} finished={finished} />}
-      {tab === "Stats" && <GroupStats c={c} st={st} checkins={data.checkins} members={data.members} />}
-      {tab === "Chat" && <Chat c={c} userId={userId!} members={data.members} />}
+      {shownTab === "Leaderboard" && <Leaderboard c={c} st={st} userId={userId!} finished={finished} />}
+      {shownTab === "Stats" && <GroupStats c={c} st={st} checkins={data.checkins} userId={userId!} />}
+      {shownTab === "Chat" && <Chat c={c} userId={userId!} members={data.members} />}
       {sheets()}
     </main>
   );
@@ -392,6 +444,14 @@ function ChallengePage({ id }: { id: string }) {
           <CheckInSheet open onClose={() => setCheckin(null)} onSaved={() => { toast({ text: checkin.existing ? "Check-in updated." : <><b>Checked in!</b> Nice work.</> }); load(); }}
             challenge={c!} userId={userId} habitId={me!.habit_id} habitName={habitName} existing={checkin.existing ?? null} initialDate={checkin.date} minAmount={isV2(c!) ? (c!.same_goal ? c!.min_amount : me!.goal_amount ?? c!.min_amount) : null} />
         )}
+        {(() => {
+          const ci = openCi ? data!.checkins.find((x) => x.id === openCi) : null;
+          return ci && userId ? (
+            <PostSheet post={{ key: `c:${ci.id}`, ref: { kind: "checkin", id: ci.id }, at: ci.created_at, authorId: ci.user_id, ci, challenge: c! }} uid={userId} who={who}
+              photo={ci.photo_path ? photos[ci.photo_path] : undefined} social={socialOf(ci)} onClose={() => setOpenCi(null)}
+              onReact={(e) => onReact(ci, e)} onComment={(body) => onComment(ci, body)} onDelete={(cid) => onDeleteComment(ci, cid)} />
+          ) : null;
+        })()}
         <Sheet open={shareOpen} onClose={() => setShareOpen(false)} label="Invite friends">
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center", paddingTop: 6 }}>
             {params.get("created") === "1" && <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--primary)", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="check" size={36} stroke={2.4} /></div>}
@@ -402,7 +462,7 @@ function ChallengePage({ id }: { id: string }) {
           </div>
           <div className="field" style={{ paddingRight: 6 }}>
             <span style={{ flex: 1, fontSize: 13.5, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{url.replace(/^https?:\/\//, "")}</span>
-            <button aria-label="Copy link" onClick={async () => { await navigator.clipboard.writeText(url); toast({ text: "Link copied." }); }} style={{ width: 38, height: 38, borderRadius: 12, border: 0, background: "var(--soft-l)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="copy" size={18} /></button>
+            <button aria-label="Copy link" onClick={async () => { await toGroup(); await navigator.clipboard.writeText(url); toast({ text: "Link copied." }); }} style={{ width: 38, height: 38, borderRadius: 12, border: 0, background: "var(--soft-l)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="copy" size={18} /></button>
           </div>
           <button className="btn btn-primary" onClick={share}><Icon name="share" />Share link</button>
           <button className="btn btn-soft" onClick={() => { setShareOpen(false); setInviteOpen(true); }}><Icon name="users" />Invite friends on Frejas</button>
@@ -420,11 +480,11 @@ function ChallengePage({ id }: { id: string }) {
             <input type="date" value={newStart} min={addDays(t, -365)} max={maxStart} onChange={(e) => setNewStart(e.target.value)} aria-label="Start date" style={{ minHeight: 44 }} />
           </label>
           {newStart > maxStart && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>Pick {formatShort(maxStart)} or earlier.</div>}
-          <button className="btn btn-primary" disabled={!newStart || newStart === c!.starts_on || newStart > maxStart} onClick={changeStart}>
+          <button className="btn btn-primary" onClick={changeStart}>
             <Icon name="check" stroke={2.4} />{newStart && newStart < c!.starts_on ? `Start ${formatShort(newStart)} instead` : "Save"}
           </button>
         </Sheet>
-        <InviteSheet open={inviteOpen} onClose={() => setInviteOpen(false)} c={c!} userId={userId!} members={data!.members} onShareLink={() => { setInviteOpen(false); setShareOpen(true); }} />
+        <InviteSheet open={inviteOpen} onClose={() => setInviteOpen(false)} c={c!} userId={userId!} members={data!.members} onShareLink={() => { setInviteOpen(false); setShareOpen(true); }} beforeInvite={toGroup} />
         <Sheet open={menu} onClose={() => setMenu(false)} label="Challenge menu">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="h1" style={{ fontSize: 22 }}>{c!.name}</div>
@@ -435,9 +495,11 @@ function ChallengePage({ id }: { id: string }) {
               <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setMenu(false); setInviteOpen(true); }}>
                 <Icon name="users" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Invite friends</div></button>
             ) : (
-              <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setMenu(false); makeGroup(); }}>
+              <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setMenu(false); setInviteOpen(true); }}>
                 <Icon name="users" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Make it a group challenge</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Your progress so far is kept</div></div></button>
             )}
+            {group && isCreator && data!.members.length === 1 && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={toSolo}>
+              <Icon name="user" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Make it just me again</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Nobody has joined yet. Invitations you sent are withdrawn.</div></div></button>}
             {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
             {isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewStart(c!.starts_on); setMenu(false); setStartOpen(true); }}>
               <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
@@ -461,6 +523,25 @@ function Leaderboard({ c, st, userId, finished }: { c: Challenge; st: Standing[]
     : rule === "most" ? (c.unit ? `Most ${c.unit} in total wins.` : "Most sessions in total wins.")
       : "Highest % of their goal wins. Extra sessions in a week don't count.";
   const rows = rule === "finishers" ? [...st].sort((a, b) => b.progress - a.progress) : st;
+  // a short push on your own row: how far it is to first place, or to making it
+  const meIdx = rows.findIndex((s) => s.user_id === userId);
+  const gapText = (n: number) => rule === "most" ? (c.unit ? `${fmt(n)} ${c.unit}` : `${fmt(n)} ${n === 1 ? "session" : "sessions"}`) : `${fmt(n)}%`;
+  let nudge: string | null = null;
+  if (!finished && meIdx >= 0) {
+    const me = rows[meIdx];
+    if (rule === "finishers") {
+      const need = Math.ceil((me.target * c.finish_pct) / 100) - me.done;
+      nudge = me.finished ? "You've made it. Everything from here is a bonus." : need > 0 ? `Only ${need} more ${need === 1 ? "session" : "sessions"} and you've made it` : null;
+    } else if (rows.length > 1) {
+      if (meIdx === 0) {
+        const gap = me.value - rows[1].value;
+        nudge = gap > 0 ? `You're in the lead, ${gapText(gap)} ahead of ${rows[1].name}` : `Level with ${rows[1].name}. Your next check-in decides it.`;
+      } else {
+        const gap = rows[0].value - me.value;
+        nudge = gap > 0 ? `Only ${gapText(gap)} to 1st place` : `Level with ${rows[0].name}. One more check-in takes 1st place.`;
+      }
+    }
+  }
   return (
     <>
       <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{explain}</div>
@@ -475,7 +556,7 @@ function Leaderboard({ c, st, userId, finished }: { c: Challenge; st: Standing[]
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>{isMe ? "You" : s.name}</span>
-                {tag && <span className="tag tag-accent" style={{ display: "flex", alignItems: "center", gap: 3, fontWeight: 800 }}><Icon name={tag === "Made it" ? "check" : "trophy"} size={12} color="var(--accent)" stroke={2.2} />{tag}</span>}
+                {tag && <span className="tag tag-accent" style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 800, lineHeight: 1, padding: "4px 9px 4px 7px" }}><Icon name={tag === "Made it" ? "check" : "trophy"} size={14} color="var(--accent)" stroke={2.1} />{tag}</span>}
                 <span style={{ marginLeft: "auto", fontSize: "var(--t-title)", fontWeight: 800 }}>{rule === "finishers" ? `${s.progress}%` : s.display}</span>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: "var(--soft)", position: "relative" }}>
@@ -486,6 +567,7 @@ function Leaderboard({ c, st, userId, finished }: { c: Challenge; st: Standing[]
                 <span>{isV2(c) ? `${s.done} of ${s.target} sessions` : `${s.done} of ${s.target} days`}</span>
                 {!c.same_goal && <span>Goal {s.goalLabel}</span>}
               </div>
+              {isMe && nudge && <div className="t-tag" style={{ display: "flex", alignItems: "center", gap: 4, color: "var(--nav-on)", fontWeight: 800 }}><Flame size={14} />{nudge}</div>}
             </div>
           </div>
         );
@@ -494,39 +576,109 @@ function Leaderboard({ c, st, userId, finished }: { c: Challenge; st: Standing[]
   );
 }
 
-// ---------------------------------------------------------------- group stats
-function GroupStats({ c, st, checkins, members }: { c: Challenge; st: Standing[]; checkins: CheckIn[]; members: Member[] }) {
-  const weeks = isV2(c) ? weekResults(c, members[0], []) : [];
-  const perWeek = weeks.filter((w) => !w.isFuture).map((w) => ({ w, n: checkins.filter((x) => x.checkin_date >= w.from && x.checkin_date <= w.to).length }));
-  const max = Math.max(1, ...perWeek.map((p) => p.n));
-  const avg = st.length ? Math.round(st.reduce((a, s) => a + s.progress, 0) / st.length) : 0;
-  const tile = (v: string | number, l: string) => <div className="card" style={{ padding: 14, borderRadius: 20 }}><div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{v}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{l}</div></div>;
-  const longest = [...st].sort((a, b) => b.longestStreak - a.longestStreak)[0];
-  const most = [...st].sort((a, b) => b.checkins - a.checkins)[0];
-  const photosTop = [...st].sort((a, b) => b.photos - a.photos)[0];
-  const elapsed = Math.max(0, Math.min(totalDays(c), diffDays(today(), c.starts_on) + 1));
+// ---------------------------------------------------------------- stats
+/** The wine box at the top of a stats page: a ring, one big number, and how far into the challenge we are. */
+function StatHero({ c, pct, ringLabel, big, bigLabel, extra }: { c: Challenge; pct: number; ringLabel: string; big: React.ReactNode; bigLabel: string; extra?: string }) {
+  const all = totalDays(c);
+  const elapsed = Math.max(0, Math.min(all, diffDays(today(), c.starts_on) + 1));
+  return (
+    <section style={{ padding: "18px 18px 16px", borderRadius: 24, background: "var(--hero)", color: "var(--on-hero)", display: "flex", alignItems: "center", gap: 18 }}>
+      <Ring size={92} stroke={9} pct={pct} track="rgba(255, 255, 255, 0.16)" color="var(--hero-ring)">
+        <span className="ring-num" style={{ fontSize: 20 }}>{pct}%</span><span style={{ fontSize: 10.5, opacity: 0.8, marginTop: 3 }}>{ringLabel}</span>
+      </Ring>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div>
+          <div className="font-display" style={{ fontSize: "var(--t-display)", fontWeight: 600, lineHeight: 1 }}>{big}</div>
+          <div className="t-sub" style={{ color: "var(--hero-ring)", fontWeight: 700, marginTop: 3 }}>{bigLabel}</div>
+        </div>
+        <div>
+          <div style={{ height: 5, borderRadius: 3, background: "rgba(255, 255, 255, 0.16)" }}><div style={{ width: `${(elapsed / all) * 100}%`, height: 5, borderRadius: 3, background: "var(--hero-ring)" }} /></div>
+          <div className="t-meta" style={{ marginTop: 5, opacity: 0.85 }}>Day {elapsed} of {all}{extra ? ` · ${extra}` : ""}</div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const factRow = (label: string, value: React.ReactNode) => (
+  <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>{label}</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 800 }}>{value}</span></div>
+);
+
+/** Bars of the same width whether there are two or twenty, so a short challenge doesn't get stretched boxes. */
+function Bars({ items, max }: { items: { key: string; value: number; ghost?: number; top: React.ReactNode; foot: React.ReactNode; strong?: boolean; faded?: boolean }[]; max: number }) {
+  const H = 96;
+  return (
+    <div className="no-scrollbar" style={{ display: "flex", gap: 10, overflowX: "auto", alignItems: "flex-end", margin: "0 -16px", padding: "2px 16px 2px" }}>
+      {items.map((it) => (
+        <div key={it.key} style={{ width: 40, flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, opacity: it.faded ? 0.45 : 1 }}>
+          <span className="t-meta" style={{ fontWeight: 800 }}>{it.top}</span>
+          <div style={{ width: 22, height: H, display: "flex", alignItems: "flex-end", position: "relative" }}>
+            {it.ghost !== undefined && <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: Math.max(6, (it.ghost / max) * H), borderRadius: 11, background: "var(--soft)" }} />}
+            <div style={{ position: "relative", width: "100%", height: it.value > 0 ? Math.max(8, (it.value / max) * H) : 0, borderRadius: 11, background: it.strong ? "var(--primary)" : "var(--primary-l)" }} />
+          </div>
+          {it.foot}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SoloStats({ c, mine, weeks, checkins }: { c: Challenge; mine: Standing; weeks: WeekResult[]; checkins: CheckIn[] }) {
+  const bonus = weeks.reduce((a, w) => a + w.extra, 0);
+  const played = weeks.filter((w) => !w.isFuture);
+  const best = played.reduce<WeekResult | null>((a, w) => (!a || w.done + w.extra > a.done + a.extra ? w : a), null);
+  const max = Math.max(1, ...weeks.map((w) => Math.max(w.target, w.done + w.extra)));
   return (
     <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-        {tile(checkins.length, "check-ins together")}
-        {tile(`${avg}%`, "group progress")}
-        {tile(c.win_rule === "finishers" ? `${st.filter((s) => s.finished).length} / ${st.length}` : checkins.filter((x) => x.photo_path).length, c.win_rule === "finishers" ? "made it so far" : "photos shared")}
-        {tile(`${elapsed} / ${totalDays(c)}`, "days done")}
-      </div>
-      {perWeek.length > 0 && (
+      <StatHero c={c} pct={mine.progress} ringLabel="of the goal" big={isV2(c) ? `${mine.done} of ${mine.target}` : mine.done} bigLabel={isV2(c) ? "sessions done" : "days done"} />
+      {weeks.length > 0 && (
         <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>Check-ins per week</span><span className="muted" style={{ fontSize: "var(--t-sub)" }}>everyone together</span></div>
-          <div role="img" aria-label="Check-ins per week" style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 90 }}>
-            {perWeek.map((p, i) => <div key={i} title={`${formatShort(p.w.from)}: ${p.n}`} style={{ flex: 1, height: `${Math.max(4, (p.n / max) * 100)}%`, borderRadius: 6, background: p.w.isCurrent ? "var(--primary)" : "var(--primary-l)" }} />)}
-          </div>
-          <div className="muted" style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5 }}><span>{formatShort(perWeek[0].w.from)}</span><span>This week</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>Week by week</span><span className="muted" style={{ fontSize: "var(--t-sub)" }}>sessions · light bar = the goal</span></div>
+          <Bars max={max} items={weeks.map((w, i) => ({
+            key: w.from, value: w.done + w.extra, ghost: w.target, strong: w.done >= w.target, faded: w.isFuture,
+            top: w.isFuture ? "" : w.done + w.extra,
+            foot: <span className="t-meta" style={{ fontWeight: w.isCurrent ? 800 : 600, color: w.isCurrent ? "var(--ink)" : "var(--ink-2)", whiteSpace: "nowrap" }}>{w.isCurrent ? "Now" : `W${i + 1}`}</span>,
+          }))} />
         </section>
       )}
       <section className="card group">
-        {c.show_longest_streak && longest && longest.longestStreak > 0 && <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Longest streak</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 800 }}><Flame size={16} />{longest.name} · {longest.longestStreak} {longest.streakUnit}</span></div>}
-        {c.show_most_checkins && most && most.checkins > 0 && <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Most check-ins</div><span style={{ fontSize: 14, fontWeight: 800 }}>{most.name} · {most.checkins}</span></div>}
-        {c.show_most_photos && photosTop && photosTop.photos > 0 && <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Most photos</div><span style={{ fontSize: 14, fontWeight: 800 }}>{photosTop.name} · {photosTop.photos}</span></div>}
+        {factRow(mine.streakUnit === "weeks" ? "Weeks in a row" : "Days in a row", <><Flame size={16} />{mine.currentStreak}</>)}
+        {factRow("Longest run", `${mine.longestStreak} ${mine.streakUnit}`)}
+        {best && best.done + best.extra > 0 && factRow("Best week", `${best.done + best.extra} ${best.done + best.extra === 1 ? "session" : "sessions"} · ${formatShort(best.from)}`)}
+        {factRow("On track so far", `${mine.consistency}%`)}
+        {bonus > 0 && factRow("Bonus sessions", `+${bonus}`)}
+        {factRow("Check-ins", checkins.length)}
+        {checkins.some((x) => x.photo_path) && factRow("With a photo", checkins.filter((x) => x.photo_path).length)}
       </section>
+    </>
+  );
+}
+
+function GroupStats({ c, st, checkins, userId }: { c: Challenge; st: Standing[]; checkins: CheckIn[]; userId: string }) {
+  const avg = st.length ? Math.round(st.reduce((a, s) => a + s.progress, 0) / st.length) : 0;
+  const longest = [...st].sort((a, b) => b.longestStreak - a.longestStreak)[0];
+  const most = [...st].sort((a, b) => b.checkins - a.checkins)[0];
+  const photosTop = [...st].sort((a, b) => b.photos - a.photos)[0];
+  const byCheckins = [...st].sort((a, b) => b.checkins - a.checkins);
+  const max = Math.max(1, ...st.map((s) => s.checkins));
+  const made = st.filter((s) => s.finished).length;
+  const facts = [
+    c.show_longest_streak && longest && longest.longestStreak > 0 && factRow("Longest streak", <><Flame size={16} />{longest.name} · {longest.longestStreak} {longest.streakUnit}</>),
+    c.show_most_checkins && most && most.checkins > 0 && factRow("Most check-ins", `${most.name} · ${most.checkins}`),
+    c.show_most_photos && photosTop && photosTop.photos > 0 && factRow("Most photos", `${photosTop.name} · ${photosTop.photos}`),
+  ].filter(Boolean);
+  return (
+    <>
+      <StatHero c={c} pct={avg} ringLabel="of the goal" big={checkins.length} bigLabel="total check-ins"
+        extra={c.win_rule === "finishers" && isV2(c) ? `${made} of ${st.length} made it so far` : "the group together"} />
+      <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>Check-ins</span><span className="muted" style={{ fontSize: "var(--t-sub)" }}>per person</span></div>
+        <Bars max={max} items={byCheckins.map((s, i) => ({
+          key: s.user_id, value: s.checkins, strong: i === 0 && s.checkins > 0, top: s.checkins,
+          foot: <><Avatar name={s.name} path={s.avatar_path} size={30} /><span className="t-meta" style={{ fontWeight: s.user_id === userId ? 800 : 600, maxWidth: 46, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.user_id === userId ? "You" : s.name.split(" ")[0]}</span></>,
+        }))} />
+      </section>
+      {facts.length > 0 && <section className="card group">{facts.map((f, i) => <div key={i}>{f}</div>)}</section>}
     </>
   );
 }
@@ -590,7 +742,7 @@ function Chat({ c, userId, members }: { c: Challenge; userId: string; members: M
           <label className="field" style={{ flex: 1, minHeight: 46, borderRadius: 23 }}>
             <input value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} placeholder="Message" aria-label="Message" />
           </label>
-          <button aria-label="Send" disabled={!text.trim()} className="btn-primary" style={{ width: 46, height: 46, borderRadius: "50%", border: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: text.trim() ? 1 : 0.5 }}><Icon name="send" size={19} /></button>
+          <button aria-label="Send" className="send-btn" style={{ width: 46, height: 46 }}><Icon name="send" size={19} /></button>
         </div>
       </form>
     </>
@@ -598,7 +750,7 @@ function Chat({ c, userId, members }: { c: Challenge; userId: string; members: M
 }
 
 // ---------------------------------------------------------------- invite friends (in-app)
-function InviteSheet({ open, onClose, c, userId, members, onShareLink }: { open: boolean; onClose: () => void; c: Challenge; userId: string; members: Member[]; onShareLink: () => void }) {
+function InviteSheet({ open, onClose, c, userId, members, onShareLink, beforeInvite }: { open: boolean; onClose: () => void; c: Challenge; userId: string; members: Member[]; onShareLink: () => void; beforeInvite?: () => Promise<void> }) {
   const { toast } = useApp();
   const [friends, setFriends] = useState<{ id: string; display_name: string; avatar_path: string | null; shared: number }[]>([]);
   const [sent, setSent] = useState<Set<string>>(new Set());
@@ -608,6 +760,7 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink }: { open:
     supabase().from("challenge_invites").select("user_id").eq("challenge_id", c.id).then(({ data }) => setSent(new Set((data ?? []).map((r: { user_id: string }) => r.user_id))));
   }, [open, userId, members, c.id]);
   async function invite(uid: string) {
+    await beforeInvite?.();
     const { error } = await supabase().from("challenge_invites").insert({ challenge_id: c.id, user_id: uid, invited_by: userId });
     if (!error) { setSent((s) => new Set(s).add(uid)); toast({ text: "Invitation sent." }); }
   }
@@ -628,8 +781,9 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink }: { open:
             </div>
           ))}
         </div>
-      ) : <div className="muted" style={{ fontSize: 14 }}>Friends appear here once you&apos;ve done a challenge together. Share the link to bring new people in.</div>}
-      <button className="btn btn-soft" onClick={onShareLink}><Icon name="link" />Share the link instead</button>
+      ) : <div className="muted" style={{ fontSize: 14 }}>Your friends on Frejas show up here. Share the link to bring in someone who isn&apos;t on Frejas yet.</div>}
+      {c.solo && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>It stays just yours until you invite someone or share the link.</div>}
+      <button className="btn btn-soft" onClick={onShareLink}><Icon name="link" />Share a link instead</button>
     </Sheet>
   );
 }
@@ -638,6 +792,10 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink }: { open:
 function InviteView({ c, onJoined }: { c: Challenge; onJoined: () => void }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [names, setNames] = useState<string[]>([]);
+  useEffect(() => {
+    supabase().rpc("get_invite", { p_token: c.invite_token }).then(({ data }) => setNames(((data as { member_names: string[] }[] | null)?.[0]?.member_names) ?? []));
+  }, [c.invite_token]);
   async function accept() {
     setBusy(true);
     const { error } = await supabase().rpc("join_challenge", { p_token: c.invite_token });
@@ -658,7 +816,8 @@ function InviteView({ c, onJoined }: { c: Challenge; onJoined: () => void }) {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {isV2(c) && <Chip>{scheduleLabel(c)}</Chip>}<Chip>{formatShort(c.starts_on)} – {formatShort(c.ends_on)}</Chip>{isV2(c) && <Chip>{winRuleLabel(c.win_rule)}</Chip>}
         </div>
-        {c.stake && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 16, background: "var(--accent-bg)", fontSize: 13, fontWeight: 700 }}><Icon name="coffee" size={18} color="var(--accent)" />{c.stake}</div>}
+        {c.stake && <StakeLine stake={c.stake} />}
+        <MembersIn names={names} />
       </section>
       <button className="btn btn-primary" disabled={busy} onClick={accept}><Icon name="check" stroke={2.4} />{busy ? "Joining…" : "Join challenge"}</button>
       <button className="btn btn-soft" onClick={decline}>Not now</button>

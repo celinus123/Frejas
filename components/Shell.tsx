@@ -47,7 +47,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </>
         ) : active.length ? (
           active.map(({ challenge }) => (
-            <Option key={challenge.id} icon="trophy" title={challenge.name} sub={challenge.goal_type === "own" ? "Own goals" : "Shared goal"} onClick={() => go(`/challenges/${challenge.id}?checkin=1`)} />
+            <Option key={challenge.id} icon="trophy" title={challenge.name} sub={challenge.solo ? "Just me" : "With friends"} onClick={() => go(`/challenges/${challenge.id}?checkin=1`)} />
           ))
         ) : (
           <div className="muted" style={{ fontSize: 14, padding: "8px 4px 16px" }}>You're not in an active challenge yet. Tick habits off on Today, or start a challenge.</div>

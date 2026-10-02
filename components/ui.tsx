@@ -17,16 +17,16 @@ export function Nav({ onPlus }: { onPlus?: () => void }) {
   ];
   return (
     <nav aria-label="Main" style={{ position: "fixed", left: 0, right: 0, bottom: "calc(env(safe-area-inset-bottom) + 14px)", zIndex: 30, display: "flex", justifyContent: "center", padding: "0 16px", pointerEvents: "none" }}>
-      <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 448, height: 70, borderRadius: 35, background: "var(--surface)", boxShadow: "0 2px 6px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.12)", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 6px" }}>
+      <div style={{ pointerEvents: "auto", width: "100%", maxWidth: 448, height: 70, borderRadius: 35, background: "var(--nav)", boxShadow: "0 0 0 1px var(--nav-line), 0 2px 6px rgba(0,0,0,.06), 0 12px 32px rgba(0,0,0,.12)", display: "flex", alignItems: "center", justifyContent: "space-around", padding: "0 6px" }}>
         {items.map((it, i) => {
           if (!it) return (
-            <button key="plus" aria-label="Add" onClick={onPlus} className="btn-primary" style={{ width: 52, height: 52, borderRadius: "50%", border: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <button key="plus" aria-label="Add" onClick={onPlus} className="btn-accent" style={{ width: 52, height: 52, borderRadius: "50%", border: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
               <Icon name="plus" size={24} stroke={2.2} />
             </button>
           );
           const on = it.href === "/" ? path === "/" : path.startsWith(it.href);
           return (
-            <Link key={i} href={it.href} aria-current={on ? "page" : undefined} style={{ width: 62, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: on ? "var(--primary)" : "var(--ink-2)", fontSize: 11, fontWeight: on ? 800 : 600, textDecoration: "none" }}>
+            <Link key={i} href={it.href} aria-current={on ? "page" : undefined} style={{ width: 62, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: on ? "var(--nav-on)" : "var(--ink-2)", fontSize: 11, fontWeight: on ? 800 : 600, textDecoration: "none" }}>
               <Icon name={it.icon} size={D.icon.nav} stroke={on ? 2.1 : 1.8} />
               <span>{it.label}</span>
             </Link>

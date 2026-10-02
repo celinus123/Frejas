@@ -4,9 +4,11 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Cover } from "@/components/Cover";
-import { FrejasMark, FrejasWordmark } from "@/components/Logo";
+import { FrejasMark } from "@/components/Logo";
 import { Icon } from "@/components/Icon";
-import { Avatars } from "@/components/ui";
+import { StakeLine } from "@/components/Stake";
+import { MembersIn } from "@/components/MembersIn";
+import { forgetInvite, saveInvite } from "@/lib/savedInvites";
 import { supabase } from "@/lib/supabase";
 import { formatShort, today } from "@/lib/dates";
 import { loadHabits } from "@/lib/data";
@@ -95,6 +97,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
         if (hid && habitId === "new") await supabase().from("habits").delete().eq("id", hid);
         throw error;
       }
+      forgetInvite(token);
       if (data === "requested") { setRequested(true); setBusy(false); return; }
       router.replace(`/challenges/${inv.challenge_id}`);
     } catch (e) {
@@ -102,26 +105,25 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
     }
   }
 
-  const row = (label: string, value: React.ReactNode) => (
-    <div className="row" style={{ fontSize: 14 }}><span className="muted" style={{ flex: 1 }}>{label}</span><b style={{ textAlign: "right" }}>{value}</b></div>
-  );
+  const chip = (text: React.ReactNode) => <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: "var(--soft)" }}>{text}</span>;
+  const first = inv.member_names[0] ?? "A friend";
 
   return (
     <main className="page" style={{ minHeight: "100dvh", paddingBottom: 30, gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, paddingTop: 4 }}><FrejasMark size={36} /><FrejasWordmark height={20} /></div>
-      <div style={{ margin: "0 -20px" }}><Cover preset={inv.cover_preset} height={150} /></div>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Avatars people={inv.member_names.map((n) => ({ name: n }))} size={36} ring="var(--bg)" />
-        <div style={{ fontSize: 14 }}><b>{inv.member_names[0]}</b>{inv.member_names.length > 1 ? ` and ${inv.member_names.length - 1} more` : ""} invited you to</div>
-      </div>
-      <h1 className="h1" style={{ fontSize: 30 }}>{inv.name}</h1>
-      <div className="card group">
-        {v2 ? row("Goal", own ? "Everyone sets their own" : scheduleLabel(inv)) : row("Goal type", inv.goal_type === "own" ? "Own goals" : "Shared goal")}
-        {row("Dates", `${formatShort(inv.starts_on)} – ${formatShort(inv.ends_on)}`)}
-        {v2 && row("Who wins", winRuleLabel(inv.win_rule))}
-        {inv.stake && <div className="row" style={{ fontSize: 14 }}><span className="muted" style={{ flex: 1 }}>At stake</span>
-          <span className="tag tag-accent" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 13, fontWeight: 800 }}><Icon name="coffee" size={15} color="var(--accent)" />{inv.stake}</span></div>}
-      </div>
+      <div style={{ display: "flex", alignItems: "center", minHeight: 40 }}><FrejasMark size={38} /></div>
+      <div style={{ margin: "0 -20px" }}><Cover preset={inv.cover_preset} height={170} /></div>
+      {/* the same card as an invitation inside the app */}
+      <section className="card" style={{ marginTop: -62, position: "relative", padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+        <span className="muted" style={{ fontSize: 13, fontWeight: 700 }}>{approve ? `${first}'s challenge` : "You're invited to"}</span>
+        <h1 className="h1">{inv.name}</h1>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {chip(v2 ? (own ? "Everyone sets their own goal" : scheduleLabel(inv)) : inv.goal_type === "own" ? "Own goals" : "Shared goal")}
+          {chip(`${formatShort(inv.starts_on)} – ${formatShort(inv.ends_on)}`)}
+          {v2 && chip(winRuleLabel(inv.win_rule))}
+        </div>
+        {inv.stake && <StakeLine stake={inv.stake} />}
+        <MembersIn names={inv.member_names} />
+      </section>
 
       {requested ? (
         <>
@@ -129,7 +131,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
             <Icon name="clock" size={22} />
             <div>
               <div style={{ fontWeight: 800 }}>Request sent</div>
-              <div style={{ fontSize: 13.5, marginTop: 2 }}>{inv.member_names[0]} lets people in. You'll find it under Challenges once you're approved.</div>
+              <div style={{ fontSize: 13.5, marginTop: 2 }}>{first} lets people in. You'll find it under Challenges once you're approved.</div>
             </div>
           </div>
           <div style={{ flex: 1 }} />
@@ -175,13 +177,14 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
             </>
           )}
           {(askTimes || askAmount) && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Others see your goal. It locks when the challenge starts.</div>}
-          {approve && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{inv.member_names[0]} approves new people, so you'll send a request.</div>}
+          {approve && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>A link can be passed on to anyone, so {first} says yes to everyone who uses this one. Friends invited inside Frejas join straight away.</div>}
           {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
           <div style={{ flex: 1 }} />
-          <button className="btn btn-primary" disabled={busy || (askAmount && !(num > 0))} onClick={join}>
+          <button className="btn btn-primary" disabled={busy} onClick={() => (askAmount && !(num > 0) ? setErr("Type your goal first.") : join())}>
             <Icon name={approve ? "send" : "check"} stroke={2.2} />{busy ? (approve ? "Sending…" : "Joining…") : approve ? "Ask to join" : "Join challenge"}
           </button>
-          <Link href="/" className="btn btn-soft">Not now</Link>
+          {/* kept under Challenges → Invitations, so you can come back to it */}
+          <button className="btn btn-soft" onClick={() => { saveInvite(token); router.replace("/challenges"); }}>Not now</button>
         </>
       )}
     </main>

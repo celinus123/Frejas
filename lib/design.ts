@@ -17,8 +17,10 @@ export const D = {
     comment: 9.5,  // the comment bubble on a photo
   },
   icon: { action: 15, inline: 12, nav: 23 },
-  emoji: { pick: 15, pickGap: 4, pickPad: 6, sum: 10, sumGap: -0.5 },
-  avatar: { post: 38, comment: 15, friend: 40 },   // post: the same on check-ins, habit cards and update tiles
+  // afterHeart: space between the heart and the emoji people reacted with · count: show how many reacted
+  emoji: { pick: 15, pickGap: 4, pickPad: 6, sum: 10, sumGap: -0.5, afterHeart: 1, count: false },
+  // post: the same on check-ins, habit cards and update tiles · friendGap: space between friends in the row at the top of the feed
+  avatar: { post: 38, comment: 15, friend: 40, friendGap: 8 },
   bubble: { pad: 3.5, maxWidth: 60, dark: 0.4, x: 8, y: 7, lines: 2, showName: false },
   card: { radius: 19, pad: 13, rowGap: 5, colGap: 11, ratio: "1 / 1", pickerX: 2, pickerY: 7, whoOnPhoto: true },
 } as const;
@@ -34,7 +36,7 @@ export const cssVars: Record<string, string> = {
   "--t-display": px(D.text.display), "--t-section": px(D.text.section), "--t-title": px(D.text.title), "--t-text": px(D.text.text),
   "--t-sub": px(D.text.sub), "--t-meta": px(D.text.meta), "--t-tag": px(D.text.tag), "--t-comment": px(D.text.comment),
   "--i-action": px(D.icon.action), "--i-inline": px(D.icon.inline), "--i-nav": px(D.icon.nav),
-  "--e-pick": px(D.emoji.pick), "--e-pick-gap": px(D.emoji.pickGap), "--e-pick-pad": px(D.emoji.pickPad), "--e-sum": px(D.emoji.sum), "--e-sum-gap": px(D.emoji.sumGap),
+  "--e-pick": px(D.emoji.pick), "--e-pick-gap": px(D.emoji.pickGap), "--e-pick-pad": px(D.emoji.pickPad), "--e-sum": px(D.emoji.sum), "--e-sum-gap": px(D.emoji.sumGap), "--e-after-heart": px(D.emoji.afterHeart),
   "--a-post": px(D.avatar.post), "--a-comment": px(D.avatar.comment), "--a-friend": px(D.avatar.friend),
   "--c-pad": px(D.bubble.pad), "--c-w": `${D.bubble.maxWidth}%`, "--c-op": String(D.bubble.dark), "--c-x": px(D.bubble.x), "--c-y": px(D.bubble.y), "--c-lines": String(D.bubble.lines),
   "--card-r": px(D.card.radius), "--card-pad": px(D.card.pad), "--row-gap": px(D.card.rowGap), "--col-gap": px(D.card.colGap), "--photo-ratio": D.card.ratio,

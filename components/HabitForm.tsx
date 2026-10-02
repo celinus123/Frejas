@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { addDays, formatShort, frequencyLabel, habitStart, isScheduledOn, today } from "@/lib/dates";
@@ -40,6 +40,7 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [others, setOthers] = useState<Habit[]>([]);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeInto, setMergeInto] = useState("");
+  const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -77,7 +78,9 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   }
 
   async function save() {
-    if (!userId || !valid) return;
+    if (!userId) return;
+    if (!name.trim()) { setErr("Give the habit a name first."); nameRef.current?.focus(); return; }
+    if (!valid) { setErr("Pick at least one day."); return; }
     setBusy(true); setErr(null);
     const row = {
       name: name.trim(), frequency: freq,
@@ -132,14 +135,15 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   }
 
   return (
-    <main className="page" style={{ gap: 12, paddingBottom: 40 }}>
+    <main className="page" style={{ gap: 12, paddingBottom: 0, minHeight: "100dvh" }}>
+      {/* Save is the wide button at the bottom of the page, where every other form in the app has it */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
-        <button onClick={() => router.back()} style={{ border: 0, background: "none", fontSize: 15, fontWeight: 600, color: "var(--ink-2)", height: 44 }}>Cancel</button>
+        <button onClick={() => router.back()} style={{ border: 0, background: "none", fontSize: 15, fontWeight: 600, color: "var(--ink-2)", height: 44, minWidth: 60, textAlign: "left", padding: 0 }}>Cancel</button>
         <div style={{ fontSize: 16, fontWeight: 800 }}>{habit ? "Edit habit" : "New habit"}</div>
-        <button onClick={save} disabled={!valid || busy} style={{ border: 0, background: "none", fontSize: 15, fontWeight: 800, color: "var(--primary)", height: 44, opacity: valid ? 1 : 0.4 }}>{busy ? "Saving" : "Save"}</button>
+        <div style={{ width: 60 }} />
       </div>
 
-      <label className="field"><input autoFocus={!habit} maxLength={60} placeholder="e.g. Read 20 minutes" value={name} onChange={(e) => setName(e.target.value)} aria-label="Habit name" /></label>
+      <label className="field"><input ref={nameRef} autoFocus={!habit} maxLength={60} placeholder="e.g. Read 20 minutes" value={name} onChange={(e) => { setName(e.target.value); setErr(null); }} aria-label="Habit name" /></label>
       {!habit && name.trim().length >= 3 && (() => {
         const twin = bestMatch(name, others);
         return twin && (
@@ -232,8 +236,6 @@ export function HabitForm({ habit }: { habit?: Habit }) {
       </div>
       <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Reminders are coming in a later version.</div>
 
-      {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
-
       {habit && (
         <div className="card group" style={{ marginTop: 10 }}>
           <button className="row" onClick={archive} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
@@ -266,6 +268,12 @@ export function HabitForm({ habit }: { habit?: Habit }) {
           </button>
         </div>
       )}
+
+      <div style={{ flex: 1 }} />
+      <div className="form-foot">
+        {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
+        <button className="btn btn-primary" disabled={busy} onClick={save}><Icon name="check" stroke={2.4} />{busy ? "Saving…" : habit ? "Save changes" : "Save habit"}</button>
+      </div>
     </main>
   );
 }

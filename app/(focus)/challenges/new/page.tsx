@@ -11,10 +11,11 @@ import { alignHabitStart, backfillCheckins, loadHabits, myFriends } from "@/lib/
 import { bestMatch } from "@/lib/similar";
 import { uploadCover } from "@/lib/photos";
 import { planWeeks, scheduleLabel } from "@/lib/scoring";
+import { STAKE_EMOJIS, STAKE_MAX, joinStake, stakeParts } from "@/lib/stake";
 import type { Challenge, CoverPreset, Habit } from "@/lib/types";
 
 type Freq = "daily" | "specific_days" | "times_per_week";
-type Unit = "" | "min" | "km" | "steps";
+type Unit = string; // "" = just done; "min", "km", "steps", or a unit of your own ("pages", "reps")
 type Dur = "2w" | "1m" | "2m" | "custom";
 type Win = Challenge["win_rule"];
 
@@ -93,6 +94,10 @@ function NewChallenge() {
   const [sameGoal, setSameGoal] = useState(true);
   const [win, setWin] = useState<Win>("finishers");
   const [stake, setStake] = useState("");
+  const [stakeEmoji, setStakeEmoji] = useState<string | null>(null);   // the icon shown with the stake; null = the coffee cup
+  const [unitEdit, setUnitEdit] = useState(false);
+  const [unitDraft, setUnitDraft] = useState("");
+  const nameRef = useRef<HTMLInputElement>(null);
   const [friends, setFriends] = useState<{ id: string; display_name: string; avatar_path: string | null; shared: number }[]>([]);
   const [invitees, setInvitees] = useState<Set<string>>(new Set());
   const [joinMode, setJoinMode] = useState<"approve" | "open">("approve");
@@ -123,7 +128,7 @@ function NewChallenge() {
       if (c.days) setDays(c.days); if (c.times_per_week) setTimes(c.times_per_week);
       const u = (c.unit ?? "") as Unit; setUnit(u); if (c.min_amount) setMinAmount(c.min_amount);
       setStart(c.starts_on < t ? t : c.starts_on); setDur("custom"); setCustomEnd(c.ends_on);
-      setSameGoal(c.same_goal); setWin(c.win_rule); setStake(c.stake ?? ""); setJoinMode(c.join_mode);
+      setSameGoal(c.same_goal); setWin(c.win_rule); setStake(stakeParts(c.stake).text); setStakeEmoji(stakeParts(c.stake).emoji); setJoinMode(c.join_mode);
     });
   }, [draftId, t]);
 
@@ -131,7 +136,7 @@ function NewChallenge() {
     name: name.trim() || "Untitled challenge", solo, goal_type: "own" as const, unit: unit || null,
     frequency: freq, days: freq === "specific_days" ? [...days].sort() : null, times_per_week: freq === "times_per_week" ? times : null,
     min_amount: unit ? minAmount : null, starts_on: start, ends_on: end, same_goal: sameGoal, win_rule: solo ? "finishers" : win,
-    stake: solo ? null : stake.trim() || null, join_mode: joinMode, cover_preset: preset,
+    stake: solo ? null : joinStake(stakeEmoji, stake) || null, join_mode: joinMode, cover_preset: preset,
   });
 
   async function saveRow(status: "draft" | "active"): Promise<string> {
@@ -204,7 +209,7 @@ function NewChallenge() {
     <>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
         {step === 1 ? <button onClick={() => router.back()} style={{ border: 0, background: "none", fontSize: 15, fontWeight: 600, color: "var(--ink-2)", height: 44 }}>Cancel</button>
-          : <button className="icon-btn" aria-label="Back" onClick={() => setStep(step - 1)}><Icon name="left" /></button>}
+          : <button className="icon-btn" aria-label="Back" onClick={() => { setErr(null); setStep(step - 1); }}><Icon name="left" /></button>}
         <button onClick={saveDraft} disabled={busy} style={{ border: 0, background: "none", fontSize: 14, fontWeight: 800, color: "var(--primary)", height: 44 }}>Save draft</button>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -222,7 +227,7 @@ function NewChallenge() {
       {q("New challenge")}
       <label style={{ display: "flex", flexDirection: "column", gap: 4, padding: "14px 18px", borderRadius: 20, background: "var(--surface)", boxShadow: "inset 0 0 0 2px var(--primary)" }}>
         <span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 800 }}>Name your challenge</span>
-        <input autoFocus={!draftId} maxLength={60} placeholder="e.g. Pilates body" value={name} onChange={(e) => setName(e.target.value)} aria-label="Challenge name"
+        <input ref={nameRef} autoFocus={!draftId} maxLength={60} placeholder="e.g. Pilates body" value={name} onChange={(e) => { setName(e.target.value); setErr(null); }} aria-label="Challenge name"
           className="font-display" style={{ border: 0, outline: 0, background: "none", fontSize: 26, fontWeight: 600, padding: 0, width: "100%" }} />
       </label>
       <div className="label">Who is it for?</div>
@@ -237,7 +242,7 @@ function NewChallenge() {
       </button>
       {errBox}
       <div style={{ flex: 1 }} />
-      <button className="btn btn-primary" disabled={!name.trim()} onClick={() => setStep(2)} style={{ marginTop: 10 }}>Next</button>
+      <button className="btn btn-primary" onClick={() => { if (!name.trim()) { setErr("Give your challenge a name first."); nameRef.current?.focus(); return; } setErr(null); setStep(2); }} style={{ marginTop: 10 }}>Next</button>
 
       <Sheet open={coverOpen} onClose={() => setCoverOpen(false)} label="Cover image">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -267,7 +272,14 @@ function NewChallenge() {
   );
 
   if (step === 2) {
-    const startOpts = [{ v: t, l: "Today" }, { v: nextMonday(t), l: formatShort(nextMonday(t)).replace(/^/, "Mon ") }, { v: firstOfNextMonth(t), l: formatShort(firstOfNextMonth(t)) }];
+    const startOpts = [{ v: t, l: "Today" }, { v: nextMonday(t), l: "Next Monday" }, { v: firstOfNextMonth(t), l: formatShort(firstOfNextMonth(t)) }];
+    const ownUnit = !!unit && !UNITS.some((u) => u.v === unit);
+    const ready = () => {
+      if (freq === "specific_days" && !days.length) { setErr("Pick at least one day."); return false; }
+      if (end < t) return false;
+      setErr(null); return true;
+    };
+    const saveUnit = () => { const u = unitDraft.trim().toLowerCase().slice(0, 16); setUnitEdit(false); setUnitDraft(""); if (u) { setUnit(u); setMinAmount(10); } };
     const custom = !startOpts.some((o) => o.v === start);
     return (
       <main className="page" style={{ gap: 10, paddingBottom: 40 }}>
@@ -292,8 +304,17 @@ function NewChallenge() {
         <div className="label" style={{ display: "flex", justifyContent: "space-between" }}>What counts<span style={{ fontWeight: 600 }}>Optional</span></div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {UNITS.map((u) => <button key={u.v} className="chip" aria-pressed={unit === u.v} onClick={() => { setUnit(u.v); setMinAmount(u.v === "steps" ? 10000 : u.v === "km" ? 5 : 30); }}>{u.l}</button>)}
+          {/* your own unit, e.g. pages or reps */}
+          {unitEdit ? (
+            <label className="chip" style={{ paddingRight: 6 }}>
+              <input autoFocus maxLength={16} value={unitDraft} placeholder="e.g. pages" aria-label="Your own unit" onChange={(e) => setUnitDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") saveUnit(); if (e.key === "Escape") { setUnitEdit(false); setUnitDraft(""); } }} onBlur={saveUnit}
+                style={{ border: 0, outline: 0, background: "none", width: 110, fontWeight: 700 }} />
+            </label>
+          ) : ownUnit ? <button className="chip" aria-pressed onClick={() => { setUnitDraft(unit); setUnitEdit(true); }}>{unit}</button>
+            : <button className="chip" onClick={() => setUnitEdit(true)} style={{ color: "var(--ink-2)" }}><Icon name="plus" size={15} stroke={2.2} />Custom</button>}
         </div>
-        {unit && <Stepper value={minAmount} set={setMinAmount} min={1} max={unit === "steps" ? 50000 : 600} step={unit === "steps" ? 1000 : unit === "km" ? 1 : 5} unit={`${unit} or more`} />}
+        {unit && <Stepper value={minAmount} set={setMinAmount} min={1} max={unit === "steps" ? 50000 : ownUnit ? 10000 : 600} step={unit === "steps" ? 1000 : unit === "min" ? 5 : 1} unit={`${unit} or more`} />}
 
         <div className="label">Starts</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -311,7 +332,7 @@ function NewChallenge() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {([["2w", "2 weeks"], ["1m", "1 month"], ["2m", "2 months"]] as [Dur, string][]).map(([v, l]) => <button key={v} className="chip" aria-pressed={dur === v} onClick={() => setDur(v)}>{l}</button>)}
           <label className="chip" aria-pressed={dur === "custom"} style={{ position: "relative", cursor: "pointer" }}>
-            <Icon name="calendar" size={15} />{dur === "custom" ? `Until ${formatShort(end)}` : "Custom"}
+            <Icon name="calendar" size={15} />{dur === "custom" ? `Until ${formatShort(end)}` : "Pick a date"}
             <input type="date" min={start} value={end} onChange={(e) => { if (e.target.value) { setCustomEnd(e.target.value); setDur("custom"); } }} aria-label="End date"
               style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
           </label>
@@ -329,7 +350,7 @@ function NewChallenge() {
         </div>
         {myHabits.length > 0 && (
           <>
-            <div className="label">Counts on</div>
+            <div className="label">{solo ? "Counts on" : <>Your own habit <span style={{ fontWeight: 600 }}>· only for you</span></>}</div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="chip" aria-pressed={!linkTo} onClick={() => { setLinkTo(null); setLinkTouched(true); }}>New habit</button>
               {(() => {
@@ -339,7 +360,7 @@ function NewChallenge() {
                 return show.map((h) => <button key={h.id} className="chip" aria-pressed={linkTo === h.id} onClick={() => { setLinkTo(h.id); setLinkTouched(true); }}>{h.name}</button>);
               })()}
               <label className="chip" style={{ position: "relative", color: "var(--ink-2)" }}>
-                Another habit…
+                Link a habit…
                 <select value="" onChange={(e) => { if (e.target.value) { setLinkTo(e.target.value); setLinkTouched(true); } }} aria-label="Pick one of your habits"
                   style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}>
                   <option value="">Pick a habit</option>
@@ -350,14 +371,15 @@ function NewChallenge() {
             <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
               {linkTo ? <>Ticking <b style={{ color: "var(--ink)" }}>{myHabits.find((h) => h.id === linkTo)?.name}</b> on Today checks you in here. It keeps going after the challenge ends.</>
                 : "A new habit shows up on Today while the challenge runs. When it ends, you choose whether to keep it."}
+              {!solo && " This is about your own Today. Friends pick their own habit when they join."}
             </div>
           </>
         )}
         {end < t && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>With that start date it would already be over. Pick a later end.</div>}
         {errBox}
         <div style={{ flex: 1 }} />
-        {solo ? <button className="btn btn-primary" disabled={busy || end < t || (freq === "specific_days" && !days.length)} onClick={create} style={{ marginTop: 10 }}><Icon name="check" stroke={2.4} />{busy ? "Creating…" : "Create challenge"}</button>
-          : <button className="btn btn-primary" disabled={end < t || (freq === "specific_days" && !days.length)} onClick={() => setStep(3)} style={{ marginTop: 10 }}>Next</button>}
+        {solo ? <button className="btn btn-primary" disabled={busy} onClick={() => ready() && create()} style={{ marginTop: 10 }}><Icon name="check" stroke={2.4} />{busy ? "Creating…" : "Create challenge"}</button>
+          : <button className="btn btn-primary" onClick={() => ready() && setStep(3)} style={{ marginTop: 10 }}>Next</button>}
       </main>
     );
   }
@@ -369,7 +391,7 @@ function NewChallenge() {
       <div className="label">Goal for everyone</div>
       <div style={{ display: "flex", gap: 10 }}>
         <Choice icon="users" title="Same goal" sub={`Everyone: ${schedule}`} on={sameGoal} onClick={() => setSameGoal(true)} />
-        <Choice icon="user" title="Own goals" sub="Each person sets theirs when joining." on={!sameGoal} onClick={() => setSameGoal(false)} />
+        <Choice icon="user" title="Own goals" sub={`Each person picks ${freq === "times_per_week" ? "how often" : unit ? "how much" : "their own"}${freq === "times_per_week" && unit ? " and how much" : ""}. Dates and rules stay the same.`} on={!sameGoal} onClick={() => setSameGoal(false)} />
       </div>
       <div className="label">Who wins?</div>
       <div role="radiogroup" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -378,7 +400,16 @@ function NewChallenge() {
         <Radio title="Most sessions" sub={unit ? `Whoever logs the most ${unit}, wins.` : "Whoever does the most, wins."} on={win === "most"} onClick={() => setWin("most")} />
       </div>
       <div className="label" style={{ display: "flex", justifyContent: "space-between" }}>What's at stake<span style={{ fontWeight: 600 }}>Optional</span></div>
-      <label className="field"><Icon name="coffee" color="var(--accent)" /><input maxLength={80} placeholder={win === "finishers" ? "e.g. Finishers get brunch" : "e.g. Loser buys coffee"} value={stake} onChange={(e) => setStake(e.target.value)} aria-label="Stake" /></label>
+      <label className="field">{stakeEmoji ? <span className="em" aria-hidden="true" style={{ fontSize: 18, width: 20, textAlign: "center" }}>{stakeEmoji}</span> : <Icon name="coffee" color="var(--accent)" />}
+        <input maxLength={STAKE_MAX} placeholder={win === "finishers" ? "e.g. Finishers get brunch" : "e.g. Loser buys coffee"} value={stake} aria-label="Stake"
+          onChange={(e) => { const p = stakeParts(e.target.value); if (p.emoji) { setStakeEmoji(p.emoji); setStake(p.text); } else setStake(e.target.value); }} /></label>
+      {/* the icon shown next to the stake: the cup, one of these, or any emoji typed first in the box */}
+      <div role="group" aria-label="Icon for the stake" className="no-scrollbar" style={{ display: "flex", gap: 6, overflowX: "auto", margin: "0 -20px", padding: "2px 20px 4px" }}>
+        <button className="chip" aria-pressed={!stakeEmoji} aria-label="Coffee cup" onClick={() => setStakeEmoji(null)} style={{ width: 40, padding: 0, justifyContent: "center" }}><Icon name="coffee" size={17} /></button>
+        {STAKE_EMOJIS.map((e) => <button key={e} className="chip" aria-pressed={stakeEmoji === e} aria-label={`Icon ${e}`} onClick={() => setStakeEmoji(e)} style={{ width: 40, padding: 0, justifyContent: "center" }}><span className="em" style={{ fontSize: 17 }}>{e}</span></button>)}
+        {stakeEmoji && !(STAKE_EMOJIS as readonly string[]).includes(stakeEmoji) && <button className="chip" aria-pressed style={{ width: 40, padding: 0, justifyContent: "center" }}><span className="em" style={{ fontSize: 17 }}>{stakeEmoji}</span></button>}
+      </div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Pick an icon, or type any emoji first in the box.</div>
       <div style={{ flex: 1 }} />
       <button className="btn btn-primary" onClick={() => setStep(4)} style={{ marginTop: 10 }}>Next</button>
     </main>
@@ -403,16 +434,17 @@ function NewChallenge() {
             );
           })}
         </div>
-      ) : <div className="muted" style={{ fontSize: 13.5, padding: "0 4px" }}>No friends on Frejas yet. You&apos;ll get a link to share in the next step.</div>}
-      {friends.length > 0 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>They&apos;ll see the invitation in Challenges and can join with one tap.</div>}
-      <div className="label">Who can join with the link</div>
+      ) : <div className="muted" style={{ fontSize: 13.5, padding: "0 4px" }}>No friends on Frejas yet. You get a link to share as soon as the challenge is created.</div>}
+      {friends.length > 0 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>Friends you tick get the invitation inside Frejas, under Challenges, and join with one tap. No link needed.</div>}
+      <div className="label">People who get the link</div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>You also get a link to send to anyone who isn&apos;t your friend on Frejas yet.</div>
       <div role="radiogroup" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <Radio title="Only people I approve" sub="Anyone else who opens the link asks to join, and you say yes." on={joinMode === "approve"} onClick={() => setJoinMode("approve")} />
         <Radio title="Anyone with the link" sub="Good for bigger groups, like a gym or a class." on={joinMode === "open"} onClick={() => setJoinMode("open")} />
       </div>
       {errBox}
       <div style={{ flex: 1 }} />
-      <button className="btn btn-primary" disabled={busy} onClick={create} style={{ marginTop: 10 }}><Icon name="link" />{busy ? "Creating…" : "Create and get link"}</button>
+      <button className="btn btn-primary" disabled={busy} onClick={create} style={{ marginTop: 10 }}><Icon name="check" stroke={2.4} />{busy ? "Creating…" : invitees.size ? `Create and invite ${invitees.size}` : "Create challenge"}</button>
     </main>
   );
 }

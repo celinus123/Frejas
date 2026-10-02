@@ -7,11 +7,17 @@ import { Cover } from "@/components/Cover";
 import { Icon } from "@/components/Icon";
 import { Ring } from "@/components/Ring";
 import { Avatar, Avatars, Empty } from "@/components/ui";
+import { PageHead } from "@/components/PageHead";
 import { supabase } from "@/lib/supabase";
 import { loadChallenge, myChallenges, myDrafts, myInvitations, type Invitation, type MyChallenge } from "@/lib/data";
 import { daysLeft, fmt, isV2, ordinal, scheduleLabel, sharedTotal, standings, type Standing } from "@/lib/scoring";
 import { diffDays, formatShort, today } from "@/lib/dates";
-import type { Challenge } from "@/lib/types";
+import { forgetInvite, savedInvites } from "@/lib/savedInvites";
+import type { Challenge, CoverPreset } from "@/lib/types";
+
+/** An invitation link you answered "Not now" to (remembered on this device). */
+interface SavedLink { token: string; challenge_id: string; name: string; starts_on: string; ends_on: string; cover_preset: CoverPreset | null; member_names: string[];
+  frequency: Challenge["frequency"]; days: number[] | null; times_per_week: number | null; min_amount: number | null; unit: string | null }
 
 interface Row extends MyChallenge {
   mine: Standing | null;
@@ -30,6 +36,7 @@ export default function Challenges() {
   const [invites, setInvites] = useState<Invitation[]>([]);
   const [showFinished, setShowFinished] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [links, setLinks] = useState<SavedLink[]>([]);
   const t = today();
 
   const load = useCallback(async () => {
@@ -38,6 +45,14 @@ export default function Challenges() {
       const [mc, dr, inv] = await Promise.all([myChallenges(userId), myDrafts(userId), myInvitations(userId)]);
       setDrafts(dr);
       setInvites(inv);
+      // links put aside with "Not now": still valid, and not something you joined or were invited to in the meantime
+      const found = await Promise.all(savedInvites().map(async (token) => {
+        const { data } = await supabase().rpc("get_invite", { p_token: token });
+        const row = (data as Omit<SavedLink, "token">[] | null)?.[0];
+        if (!row || mc.some((x) => x.challenge.id === row.challenge_id)) { forgetInvite(token); return null; }
+        return inv.some((x) => x.challenge.id === row.challenge_id) ? null : { ...row, token };
+      }));
+      setLinks(found.filter((x): x is SavedLink => !!x));
       setRows(await Promise.all(mc.filter((x) => x.challenge.status !== "draft").map(async (x) => {
         const d = await loadChallenge(x.challenge.id);
         const st = standings(x.challenge, d.members, d.checkins);
@@ -70,18 +85,14 @@ export default function Challenges() {
     await supabase().from("challenge_invites").delete().eq("challenge_id", inv.challenge.id).eq("user_id", userId!);
   }
 
-  const header = (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-      <h1 className="h1">Challenges</h1>
-      <Link href="/challenges/new" className="btn btn-primary btn-sm"><Icon name="plus" size={18} stroke={2.2} />New</Link>
-    </div>
-  );
+  // a new challenge is started from the plus in the menu, so there is no second "New" button up here
+  const header = <PageHead title="Challenges" />;
   if (!rows) return <main className="page">{header}<div className="skeleton" style={{ height: 120 }} /><div className="skeleton" style={{ height: 120 }} /></main>;
 
   const active = rows.filter((r) => r.challenge.starts_on <= t && r.challenge.ends_on >= t);
   const upcoming = rows.filter((r) => r.challenge.starts_on > t).sort((a, b) => a.challenge.starts_on.localeCompare(b.challenge.starts_on));
   const finished = rows.filter((r) => r.challenge.ends_on < t).sort((a, b) => b.challenge.ends_on.localeCompare(a.challenge.ends_on));
-  const nothing = !rows.length && !drafts.length && !invites.length;
+  const nothing = !rows.length && !drafts.length && !invites.length && !links.length;
 
   const activeCard = (r: Row, i: number) => {
     const c = r.challenge;
@@ -108,7 +119,7 @@ export default function Challenges() {
           </div>
         </div>
         <Ring size={52} stroke={5} pct={pct} track={i === 0 ? "var(--surface)" : "var(--soft)"}>
-          <span style={{ fontSize: 11.5, fontWeight: 800 }}>{Math.round(pct)}%</span>
+          <span className="ring-num" style={{ fontSize: 11.5 }}>{Math.round(pct)}%</span>
         </Ring>
       </Link>
     );
@@ -124,9 +135,9 @@ export default function Challenges() {
         </Empty>
       )}
 
-      {invites.length > 0 && (
+      {invites.length + links.length > 0 && (
         <>
-          <div className="label">Invitations · {invites.length}</div>
+          <div className="label">Invitations · {invites.length + links.length}</div>
           {invites.map((inv) => {
             const c = inv.challenge;
             return (
@@ -153,6 +164,22 @@ export default function Challenges() {
               </div>
             );
           })}
+          {links.map((l) => (
+            <div key={l.token} className="card" style={{ padding: 14, borderRadius: 24, display: "flex", flexDirection: "column", gap: 12, border: "2px solid var(--accent-bg)" }}>
+              <Link href={`/join/${l.token}`} style={{ display: "flex", gap: 12, alignItems: "center", color: "inherit", textDecoration: "none" }}>
+                <Cover preset={l.cover_preset} width={56} height={56} radius={16} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5 }}><b>{l.member_names[0] ?? "A friend"}</b> sent you a link</div>
+                  <div className="font-display" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{l.name}</div>
+                  <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{l.frequency ? scheduleLabel(l) : "Challenge"} · {formatShort(l.starts_on)} – {formatShort(l.ends_on)}</div>
+                </div>
+              </Link>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button className="btn btn-soft btn-sm" style={{ flex: 1 }} onClick={() => { forgetInvite(l.token); setLinks((xs) => xs.filter((x) => x.token !== l.token)); }}>Remove</button>
+                <Link href={`/join/${l.token}`} className="btn btn-primary btn-sm" style={{ flex: 1 }}><Icon name="check" size={17} stroke={2.4} />Join</Link>
+              </div>
+            </div>
+          ))}
         </>
       )}
 

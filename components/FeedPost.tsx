@@ -49,11 +49,10 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
   const ci = post.ci, c = post.challenge;
   const mode = reactMode(post.ref);   // true: pick an emoji · "heart": plain like · false: nothing yet
 
-  const whoRow = (on: boolean, tick = false) => (
+  const whoRow = (on: boolean) => (
     <div className={on ? "who on" : "who"}>
       <Avatar name={author.name} path={author.path} size={D.avatar.post} />
       <b>{author.you ? "You" : author.name}</b><span>{timeAgo(post.at)}</span>
-      {tick && <span aria-label="Checked in" style={{ width: 20, height: 20, marginLeft: "auto", borderRadius: "50%", background: "var(--primary)", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 1 }}><Icon name="check" size={D.icon.inline} stroke={2.8} /></span>}
     </div>
   );
   const bubble = (on: boolean) => s.latest && (
@@ -66,9 +65,10 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
     <div className="acts">
       <button className={mine ? "rbtn mine" : "rbtn"} aria-expanded={mode === true ? pickerOpen : undefined} aria-pressed={mode === "heart" ? !!mine : undefined}
         aria-label={mine ? (mode === true ? `Your reaction: ${mine}. Change it` : "Remove your heart") : "React"} onClick={() => (mode === true ? setPicker(!pickerOpen) : onReact(mine ? null : "❤️"))}>
-        {mine ? <i className="em">{mine}</i> : <Icon name="heart" size={D.icon.action} />}
+        {/* always the outlined heart; it turns raspberry once you have reacted */}
+        <Icon name="heart" size={D.icon.action} />
       </button>
-      {s.total > 0 && <span className="sum" aria-label={`${s.total} reactions`}>{s.emojis.slice(0, 3).map((x) => <i key={x.e} className="em">{x.e}</i>)}<span>{s.total}</span></span>}
+      {s.total > 0 && <span className="sum" aria-label={`${s.total} ${s.total === 1 ? "reaction" : "reactions"}`}>{s.emojis.slice(0, 3).map((x) => <i key={x.e} className="em">{x.e}</i>)}{D.emoji.count && <span>{s.total}</span>}</span>}
       <button className="cbtn" onClick={onOpen} aria-label={social.comments.length ? `${social.comments.length} comments. Open` : "Write a comment"}>
         <Icon name="comment" size={D.icon.action} />{social.comments.length || ""}
       </button>
@@ -114,7 +114,7 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
   return (
     <article className="post soft">
       <div className="post-body" style={{ paddingTop: "var(--card-pad)" }}>
-        {whoRow(false, true)}
+        {whoRow(false)}
         {ci!.comment && <div className="font-display" style={{ fontSize: "var(--t-section)", fontWeight: 500, lineHeight: 1.25 }}>{ci!.comment}</div>}
         {title}{tag}{acts}{bubble(false)}
       </div>
@@ -138,7 +138,7 @@ export function Tile({ card }: { card: FunCard }) {
       );
     case "month":
       return (
-        <section className="post soft" style={pad}>
+        <section className="post" style={{ ...pad, background: "var(--accent-bg)" }}>
           <div className="t-meta muted" style={{ fontWeight: 800 }}>Your {card.month}</div>
           <div className="font-display" style={{ fontSize: "calc(var(--t-section) + 8px)", fontWeight: 600, lineHeight: 1 }}>{card.pct}%</div>
           <div className="t-text">of your habits done</div>
@@ -156,7 +156,7 @@ export function Tile({ card }: { card: FunCard }) {
       );
     case "leading":
       return (
-        <Link href={`/challenges/${card.challenge.id}`} className="post soft" style={pad}>
+        <Link href={`/challenges/${card.challenge.id}`} className="post" style={{ ...pad, background: "var(--accent-bg)" }}>
           <div style={{ position: "relative", width: D.avatar.post }}>
             <Avatar name={card.who.name} path={card.who.path} size={D.avatar.post} />
             <span style={{ position: "absolute", right: -5, bottom: -4, width: 20, height: 20, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="trophy" size={D.icon.inline} color="var(--accent)" /></span>
@@ -229,23 +229,31 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
         <div className="post-photo" style={{ flexShrink: 0 }}>{photo && <img className="post-img" src={photo} alt={ci.title} />}{head(true)}</div>
       ) : head(false)}
       <div style={{ padding: "14px 18px 6px", display: "flex", flexDirection: "column", gap: 10 }}>
-        {ci ? (
-          <div>
-            <div className="h2">{ci.title}{ci.amount ? ` · ${fmt(ci.amount)} ${c?.unit ?? ""}` : ""}</div>
-            {ci.comment && <div className="t-text muted" style={{ marginTop: 1 }}>{ci.comment}</div>}
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div className="h2">{post.habits!.length === 1 ? "A habit" : `${post.habits!.length} habits`} {dayWord(post.date!)}</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{post.habits!.map((h) => <span key={h} className="tag" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="check" size={D.icon.inline} stroke={2.6} />{h}</span>)}</div>
+        {/* the heart sits in the right corner, straight under the photo */}
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+          {ci ? (
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="h2">{ci.title}{ci.amount ? ` · ${fmt(ci.amount)} ${c?.unit ?? ""}` : ""}</div>
+              {ci.comment && <div className="t-text muted" style={{ marginTop: 1 }}>{ci.comment}</div>}
+            </div>
+          ) : (
+            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
+              <div className="h2">{post.habits!.length === 1 ? "A habit" : `${post.habits!.length} habits`} {dayWord(post.date!)}</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{post.habits!.map((h) => <span key={h} className="tag" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="check" size={D.icon.inline} stroke={2.6} />{h}</span>)}</div>
+            </div>
+          )}
+          {mode !== false && (
+            <button className={mine ? "heart-btn mine" : "heart-btn"} aria-expanded={mode === true ? pick : undefined} aria-pressed={mode === "heart" ? !!mine : undefined}
+              aria-label={mine ? (mode === true ? `Your reaction: ${mine}. Change it` : "Remove your heart") : "React"}
+              onClick={() => (mode === true ? setPick((v) => !v) : onReact(mine ? null : "❤️"))}><Icon name="heart" size={20} /></button>
+          )}
+        </div>
+        {pick && mode === true && <div style={{ display: "flex", justifyContent: "flex-end" }}><Picker inline mine={mine} onPick={(e) => { onReact(e); setPick(false); }} /></div>}
+        {s.total > 0 && (
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            {s.emojis.map((x) => <button key={x.e} className="rx-chip" aria-pressed={mine === x.e} aria-label={mine === x.e ? `Remove your ${x.e}` : `React with ${x.e}`} onClick={() => onReact(mine === x.e ? null : (x.e as Emoji))}><i className="em">{x.e}</i>{x.n}</button>)}
           </div>
         )}
-        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-          {s.emojis.map((x) => <button key={x.e} className="rx-chip" aria-pressed={mine === x.e} aria-label={mine === x.e ? `Remove your ${x.e}` : `React with ${x.e}`} onClick={() => onReact(mine === x.e ? null : (x.e as Emoji))}><i className="em">{x.e}</i>{x.n}</button>)}
-          {mode === "heart" && !mine && <button aria-label="React" onClick={() => onReact("❤️")} className="rx-chip" style={{ width: 30, padding: 0, justifyContent: "center", color: "var(--ink-2)" }}><Icon name="heart" size={D.icon.action} /></button>}
-          {mode === true && (pick ? <Picker inline mine={mine} onPick={(e) => { onReact(e); setPick(false); }} />
-            : <button aria-label="Add a reaction" onClick={() => setPick(true)} className="rx-chip" style={{ width: 30, padding: 0, justifyContent: "center", color: "var(--ink-2)" }}>{s.total ? <Icon name="plus" size={D.icon.inline} stroke={2.2} /> : <Icon name="heart" size={D.icon.action} />}</button>)}
-        </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 28 }}>
           <b className="t-title">{n ? `Comments · ${n}` : "No comments yet"}</b>
           {n > 0 && <button onClick={() => setShown((v) => !v)} aria-expanded={shown} className="t-meta muted" style={{ border: 0, background: "none", display: "flex", alignItems: "center", gap: 2, fontWeight: 700, padding: "6px 0 6px 10px" }}>{shown ? "Hide" : "Show"}<Icon name={shown ? "up" : "down"} size={D.icon.inline} stroke={2.2} /></button>}
@@ -267,7 +275,7 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
         <label className="field" style={{ minHeight: 46, borderRadius: 23, paddingRight: 6 }}>
           <input value={text} onChange={(e) => setText(e.target.value.slice(0, MAX_COMMENT))} maxLength={MAX_COMMENT} placeholder="Add a comment" aria-label="Add a comment" style={{ fontWeight: 600 }} />
           <span className="t-meta muted" style={{ fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{text.length}/{MAX_COMMENT}</span>
-          <button aria-label="Send" disabled={!text.trim() || busy} className="btn-primary" style={{ width: 36, height: 36, borderRadius: "50%", border: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", opacity: text.trim() && !busy ? 1 : 0.5 }}><Icon name="send" size={16} /></button>
+          <button aria-label="Send" disabled={busy} className="send-btn" style={{ width: 36, height: 36 }}><Icon name="send" size={16} /></button>
         </label>
       </form>
     </Sheet>

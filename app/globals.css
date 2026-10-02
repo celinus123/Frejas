@@ -21,6 +21,12 @@
   --ink-2: #75606a;
   --shadow: 0 0 0 1px rgba(46, 11, 25, 0.08), 0 2px 8px rgba(46, 11, 25, 0.06);
   --overlay: rgba(30, 8, 18, 0.45);
+  /* raspberry: the plus in the menu, send buttons and Check in. Wine (--primary) stays everywhere else. */
+  --cta: #b01e57;
+  --on-cta: #ffffff;
+  --nav: #ffffff;
+  --nav-on: #b01e57;
+  --nav-line: transparent;
   color-scheme: light;
 }
 
@@ -33,6 +39,7 @@
     --ink: #ffedf2; --ink-2: #bfa9b2;
     --shadow: 0 0 0 1px rgba(255, 237, 242, 0.06), 0 2px 10px rgba(0, 0, 0, 0.3);
     --overlay: rgba(0, 0, 0, 0.6);
+    --cta: #b01e57; --on-cta: #ffffff; --nav: #2a0b1a; --nav-on: #f7a8c4; --nav-line: rgba(255, 237, 242, 0.16);
     color-scheme: dark;
   }
 }
@@ -44,6 +51,7 @@
   --ink: #ffedf2; --ink-2: #bfa9b2;
   --shadow: 0 0 0 1px rgba(255, 237, 242, 0.06), 0 2px 10px rgba(0, 0, 0, 0.3);
   --overlay: rgba(0, 0, 0, 0.6);
+  --cta: #b01e57; --on-cta: #ffffff; --nav: #2a0b1a; --nav-on: #f7a8c4; --nav-line: rgba(255, 237, 242, 0.16);
   color-scheme: dark;
 }
 
@@ -80,13 +88,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .t-sub { font-size: var(--t-sub); line-height: 1.35; color: var(--ink-2); }
 .t-meta { font-size: var(--t-meta); }
 .t-tag { font-size: var(--t-tag); font-weight: 700; }
+/* A number inside a ring: the digits sit in the optical middle (figures of equal width, no extra line height). */
+.ring-num { font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.2px; display: block; text-align: center; }
 /* Section labels get extra air above them so blocks read as separate groups. */
 .label { font-size: 13px; font-weight: 800; color: var(--ink-2); padding: 0 4px; margin-top: 14px; }
 
 .btn { height: 52px; padding: 0 22px; border-radius: 26px; font-size: 15px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; transition: transform .1s, opacity .15s; }
 .btn:active { transform: scale(0.98); }
-.btn:disabled { opacity: .45; cursor: default; }
+/* Buttons keep their full colour. A button is only switched off while it is working ("Saving…");
+   if something is missing, tapping it says what. */
+.btn:disabled { opacity: .6; cursor: default; }
 .btn-primary { background: var(--primary); color: var(--on-primary); }
+.btn-accent { background: var(--cta); color: var(--on-cta); }
+.send-btn { border-radius: 50%; border: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--cta); color: var(--on-cta); }
+/* the action at the end of a form: one wide button, always in reach */
+.form-foot { position: sticky; bottom: 0; margin: 6px -20px 0; padding: 12px 20px calc(env(safe-area-inset-bottom) + 14px); background: linear-gradient(transparent, var(--bg) 26%); display: flex; flex-direction: column; gap: 8px; z-index: 5; }
 .btn-soft { background: var(--soft); color: var(--ink); }
 .btn-white { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .btn-sm { height: 40px; padding: 0 16px; border-radius: 20px; font-size: 13.5px; }
@@ -158,18 +174,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .cmt > span { display: -webkit-box; -webkit-line-clamp: var(--c-lines); -webkit-box-orient: vertical; overflow: hidden; }
 .cmt.on { position: absolute; left: var(--c-x); bottom: var(--c-y); max-width: min(var(--c-w), calc(100% - var(--c-x) - 6px)); background: rgba(30, 8, 18, var(--c-op)); color: #fff; }
 .cmt.in { align-self: flex-start; max-width: 100%; background: var(--surface); color: var(--ink); }
-.card .cmt.in { background: var(--soft-l); }
+/* on a white card the bubble is cream, so it isn't mistaken for the pink habit labels above it */
+.card .cmt.in { background: var(--accent-bg); }
 .post-body { padding: calc(var(--card-pad) - 2px) var(--card-pad); display: flex; flex-direction: column; gap: var(--row-gap); }
 .post-ch { display: flex; align-items: center; gap: 4px; color: var(--primary); text-decoration: none; min-width: 0; }
 .post-ch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.acts { display: flex; align-items: center; gap: 6px; min-height: calc(var(--i-action) + 12px); margin-top: 2px; color: var(--ink-2); }
+.acts { display: flex; align-items: center; gap: var(--e-after-heart); min-height: calc(var(--i-action) + 12px); margin-top: 2px; color: var(--ink-2); }
 .acts button { border: 0; background: none; padding: 0; color: inherit; display: inline-flex; align-items: center; }
 /* small icons, comfortable touch area */
-.rbtn { justify-content: center; height: calc(var(--i-action) + 12px); min-width: calc(var(--i-action) + 12px); border-radius: 999px; position: relative; }
+/* the heart: always outlined, the same size whether or not anyone has reacted; raspberry once you have */
+.rbtn { justify-content: flex-start; height: calc(var(--i-action) + 12px); min-width: calc(var(--i-action) + 3px); border-radius: 999px; position: relative; }
 .rbtn::after, .cbtn::after { content: ""; position: absolute; inset: -8px -6px; }
-.rbtn.mine { background: var(--soft); padding: 0 8px; }
-.soft .rbtn.mine { background: var(--surface); }
-.rbtn.mine .em { font-size: calc(var(--i-action) - 2px); }
+.rbtn.mine, .heart-btn.mine { color: var(--nav-on); }
+.heart-btn { width: 40px; height: 40px; margin: -6px -8px 0 0; border-radius: 50%; border: 0; background: none; color: var(--ink-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sum { display: inline-flex; align-items: center; gap: 4px; font-size: var(--t-meta); font-weight: 800; }
 .sum i { font-size: var(--e-sum); margin-left: var(--e-sum-gap); }
 .sum i:first-child { margin-left: 0; }
@@ -184,3 +201,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .rx-chip { height: 30px; padding: 0 10px 0 8px; border-radius: 15px; border: 0; background: var(--surface); box-shadow: var(--shadow); display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-meta); font-weight: 800; color: var(--ink); }
 .rx-chip[aria-pressed="true"] { background: var(--soft); box-shadow: none; }
 .rx-chip .em { font-size: calc(var(--e-sum) + 4px); }
+
+/* ---------------------------------------------------------------- a check-in in a challenge's list */
+.ci-card { display: flex; align-items: stretch; border-radius: 20px; overflow: hidden; min-height: 96px; }
+.ci-main { flex: 1; min-width: 0; padding: 12px 12px 8px 14px; display: flex; flex-direction: column; gap: 6px; }
+.ci-photo { width: 38%; max-width: 150px; flex-shrink: 0; border: 0; padding: 0; position: relative; background: var(--soft); min-height: 118px; }
+.ci-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }

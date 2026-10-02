@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
-import { Avatar, Avatars, Empty, Sheet } from "@/components/ui";
+import { Avatars, Empty, Sheet } from "@/components/ui";
+import { PageHead } from "@/components/PageHead";
 import { SwipeRow } from "@/components/SwipeRow";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { CHALLENGES, CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
@@ -18,7 +19,7 @@ import { isActive, loadChallenge, loadHabits, loadLogs, logHabit, myChallenges, 
 import { daysLeft, fmt, ordinal, sharedTotal, standings } from "@/lib/scoring";
 import type { Habit, HabitLog } from "@/lib/types";
 
-interface ChallengeCard extends MyChallenge { mine: number; rank: number; of: number; total: number; people: { name: string; path: string | null }[] }
+interface ChallengeCard extends MyChallenge { mine: number; pct: number; done: number; target: number; rank: number; of: number; total: number; people: { name: string; path: string | null }[] }
 
 export default function Today() {
   const { userId, profile, toast } = useApp();
@@ -60,7 +61,7 @@ export default function Today() {
       const st = standings(x.challenge, d.members, d.checkins);
       const idx = st.findIndex((s) => s.user_id === userId);
       return {
-        ...x, mine: idx >= 0 ? st[idx].value : 0, rank: idx + 1, of: st.length, total: sharedTotal(x.challenge, d.checkins),
+        ...x, mine: idx >= 0 ? st[idx].value : 0, pct: idx >= 0 ? st[idx].progress : 0, done: idx >= 0 ? st[idx].done : 0, target: idx >= 0 ? st[idx].target : 0, rank: idx + 1, of: st.length, total: sharedTotal(x.challenge, d.checkins),
         people: d.members.filter((m) => m.user_id !== userId).map((m) => ({ name: m.profiles?.display_name ?? "", path: m.profiles?.avatar_path ?? null })),
       };
     }));
@@ -174,10 +175,7 @@ export default function Today() {
 
   return (
     <main className="page">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <h1 className="h1">Hi, {profile.display_name}</h1>
-        <Link href="/profile" aria-label="Profile"><Avatar name={profile.display_name} path={profile.avatar_path} size={44} /></Link>
-      </div>
+      <PageHead title={<>Hi, {profile.display_name}</>} />
 
       <section className="card" style={{ padding: "8px 8px 14px", display: "flex", flexDirection: "column", gap: 8, touchAction: "pan-y" }}
         onPointerDown={(e) => { swipe.current = { x: e.clientX, y: e.clientY }; }}
@@ -302,8 +300,12 @@ export default function Today() {
                   <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
                     <Link href={`/habits/${h.id}`} style={{ flex: 1, color: "inherit", textDecoration: "none" }}>
                       <div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{h.name}</div>
-                      <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}
-                        {count > p.target && <span className="tag tag-accent" style={{ marginLeft: 6, fontWeight: 800, color: "var(--ink)" }}>+{count - p.target} bonus</span>}</div>
+                      <div className="muted" style={{ display: "flex", alignItems: "center", columnGap: 6, rowGap: 3, flexWrap: "wrap", fontSize: "var(--t-sub)", marginTop: 3 }}>
+                        <span>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}</span>
+                        {count > p.target && <span className="tag tag-accent" style={{ fontWeight: 800, color: "var(--ink)" }}>+{count - p.target} bonus</span>}
+                        {h.category && <span className="tag">{h.category}</span>}
+                        {linked.get(h.id) && <span className="t-tag" style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--primary)" }}><Icon name="trophy" size={D.icon.inline} />{linked.get(h.id)!.challenge.name}</span>}
+                      </div>
                     </Link>
                     <button className="flex-check" aria-pressed={todayDone} onClick={() => toggle(h)}
                       aria-label={todayDone ? `Undo ${h.name} for ${dayTitle}` : `Log ${h.name} for ${dayTitle}. ${count} of ${p.target} done`}>
@@ -331,13 +333,16 @@ export default function Today() {
               <Link key={c.challenge.id} href={`/challenges/${c.challenge.id}`} className={i === 0 ? "soft" : "card"}
                 style={{ width: 236, flexShrink: 0, padding: 16, borderRadius: 24, display: "flex", flexDirection: "column", gap: 12, color: "inherit", textDecoration: "none" }}>
                 <div className="muted" style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--t-sub)", fontWeight: 700 }}>
-                  <span>{c.challenge.goal_type === "own" ? "Own goals" : "Shared goal"}</span><span>{daysLeft(c.challenge)} days left</span>
+                  <span>{c.challenge.solo ? "Challenge" : "Challenge with friends"}</span><span>{daysLeft(c.challenge)} {daysLeft(c.challenge) === 1 ? "day" : "days"} left</span>
                 </div>
                 <div className="font-display" style={{ fontSize: 20, fontWeight: 600 }}>{c.challenge.name}</div>
                 {c.challenge.goal_type === "own" ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <Ring size={44} stroke={5} pct={c.mine} track={i === 0 ? "var(--surface)" : "var(--soft)"}><span style={{ fontSize: 11, fontWeight: 800 }}>{c.mine}%</span></Ring>
-                    <div style={{ flex: 1 }}><span className="tag tag-accent" style={{ fontSize: 12.5, fontWeight: 800 }}>{ordinal(c.rank)} of {c.of}</span></div>
+                    <Ring size={46} stroke={5} pct={c.pct} track={i === 0 ? "var(--surface)" : "var(--soft)"}><span className="ring-num" style={{ fontSize: 11 }}>{c.pct}%</span></Ring>
+                    {/* your place only means something when there is someone to compare with */}
+                    <div style={{ flex: 1 }}>{!c.challenge.solo && c.of > 1 && c.rank > 0
+                      ? <span className="tag tag-accent" style={{ fontSize: 12.5, fontWeight: 800 }}>{ordinal(c.rank)} place</span>
+                      : <span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{c.done} of {c.target} sessions</span>}</div>
                     <Avatars people={c.people} size={24} ring={i === 0 ? "var(--soft)" : "var(--surface)"} />
                   </div>
                 ) : (
