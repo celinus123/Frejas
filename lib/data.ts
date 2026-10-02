@@ -7,7 +7,7 @@ import { nativeShare } from "./native";
 const sb = () => supabase();
 
 // check_ins reaches profiles two ways (the author, and everyone who reacted), so the author link has to be named.
-const CHECKIN_SELECT = "*, profiles!check_ins_user_id_fkey(display_name, avatar_path), reactions(user_id)";
+const CHECKIN_SELECT = "*, profiles!check_ins_user_id_fkey(display_name, avatar_path), reactions(user_id, emoji), comments(id, user_id, body, created_at)";
 
 export async function loadHabits(uid: string, includeArchived = false): Promise<Habit[]> {
   let q = sb().from("habits").select("*").eq("owner_id", uid).order("created_at");

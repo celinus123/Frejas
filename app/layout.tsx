@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "@fontsource-variable/fraunces";
 import "@fontsource-variable/nunito-sans";
 import { AppProvider } from "@/components/AppProvider";
+import { cssVars } from "@/lib/design";
 import "./globals.css";
 
 
@@ -28,7 +29,7 @@ const themeScript = `try{var t=localStorage.getItem('orbit-theme');if(t==='light
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning style={cssVars as React.CSSProperties}>
       <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
       <body><AppProvider>{children}</AppProvider></body>
     </html>

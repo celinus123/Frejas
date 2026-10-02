@@ -38,6 +38,8 @@ const P: Record<string, string> = {
   repeat: "M17 3l3 3-3 3M20 6H8a4 4 0 0 0-4 4v1M7 21l-3-3 3-3M4 18h12a4 4 0 0 0 4-4v-1",
   flag: "M5 21V4M5 4h11l-2 4 2 4H5",
   leaf: "M5 19c0-8 5-13 14-14 0 9-5 14-13 14M5 19l7-7",
+  up: "M6 14.5l6-6 6 6",
+  down: "M6 9.5l6 6 6-6",
 };
 
 export function Icon({ name, size = 20, stroke = 1.9, fill = "none", color = "currentColor" }:

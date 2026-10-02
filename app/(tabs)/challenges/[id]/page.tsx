@@ -228,7 +228,7 @@ function ChallengePage({ id }: { id: string }) {
       </section>
       <button className="soft" onClick={() => (group ? setShareOpen(true) : makeGroup())} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 24, border: 0, textAlign: "left" }}>
         <span style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="users" /></span>
-        <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>{group ? "Invite more friends" : "Bring a friend"}</span><span className="muted" style={{ display: "block", fontSize: 12.5 }}>Invite someone before it starts</span></span>
+        <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>{group ? "Invite more friends" : "Bring a friend"}</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>Invite someone before it starts</span></span>
         <Icon name="right" size={16} />
       </button>
       {isCreator && <button onClick={startToday} style={{ height: 44, border: 0, background: "none", fontSize: 14, fontWeight: 800, color: "var(--primary)" }}>Start today instead</button>}
@@ -246,8 +246,8 @@ function ChallengePage({ id }: { id: string }) {
           {mine.finished && <span className="tag tag-accent" style={{ fontWeight: 800 }}>Made it</span>}
           {weeks.some((w) => w.extra > 0) && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{weeks.reduce((x, w) => x + w.extra, 0)} bonus</span>}
         </div>
-        {group && isV2(c) && c.win_rule !== "finishers" && <div className="muted" style={{ fontSize: 12.5 }}>You&apos;re {ordinal(myIdx + 1)} of {st.length} · {mine.display}</div>}
-        {!group && isV2(c) && !finished && <div className="muted" style={{ fontSize: 12.5 }}>{mine.consistency >= 80 ? "On track" : "A few sessions behind — you've got this"}</div>}
+        {group && isV2(c) && c.win_rule !== "finishers" && <div className="muted" style={{ fontSize: "var(--t-sub)" }}>You&apos;re {ordinal(myIdx + 1)} of {st.length} · {mine.display}</div>}
+        {!group && isV2(c) && !finished && <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{mine.consistency >= 80 ? "On track" : "A few sessions behind — you've got this"}</div>}
         {mine.currentStreak > 0 && <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12.5, fontWeight: 700 }}><Flame size={15} />{mine.currentStreak} {mine.streakUnit} in a row</div>}
       </div>
     </section>
@@ -257,7 +257,7 @@ function ChallengePage({ id }: { id: string }) {
     <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <button className="icon-btn" aria-label="Previous week" disabled={wi <= 0} onClick={() => setWeekIdx(wi - 1)} style={{ width: 30, height: 30, boxShadow: "none", background: "none", opacity: wi <= 0 ? 0.25 : 1 }}><Icon name="left" size={16} /></button>
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 800 }}>{thisWeek.isCurrent ? "This week" : `${formatShort(thisWeek.from)} – ${formatShort(thisWeek.to)}`}</span>
+        <span style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 800 }}>{thisWeek.isCurrent ? "This week" : `${formatShort(thisWeek.from)} – ${formatShort(thisWeek.to)}`}</span>
         <span style={{ fontSize: 13, fontWeight: 800 }}>{thisWeek.done} of {thisWeek.target}</span>
         {thisWeek.extra > 0 && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{thisWeek.extra} bonus</span>}
         <button className="icon-btn" aria-label="Next week" disabled={thisWeek.isCurrent || !weeks[wi + 1] || weeks[wi + 1].isFuture} onClick={() => setWeekIdx(wi + 1)}
@@ -288,7 +288,7 @@ function ChallengePage({ id }: { id: string }) {
 
   const weeksCard = weeks.length > 1 && (
     <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 15, fontWeight: 800 }}>Week by week</span><span className="muted" style={{ fontSize: 12 }}>sessions per week</span></div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>Week by week</span><span className="muted" style={{ fontSize: "var(--t-sub)" }}>sessions per week</span></div>
       <div style={{ display: "flex", gap: 4 }}>
         {weeks.map((w, i) => {
           const full = w.done >= w.target && !w.isFuture;
@@ -306,9 +306,9 @@ function ChallengePage({ id }: { id: string }) {
       <div key={ci.id} className="card" style={{ padding: "10px 12px", borderRadius: 20, display: "flex", gap: 12, alignItems: "center" }}>
         <Avatar name={ci.profiles?.display_name ?? ""} path={ci.profiles?.avatar_path} size={36} />
         <button onClick={() => mineCi && setCheckin({ existing: ci })} style={{ flex: 1, border: 0, background: "none", padding: 0, textAlign: "left", display: "flex", flexDirection: "column", gap: 2, cursor: mineCi ? "pointer" : "default" }}>
-          <span className="muted" style={{ fontSize: 12 }}><b style={{ color: "var(--ink)" }}>{mineCi ? "You" : ci.profiles?.display_name}</b> · {ci.checkin_date === t ? timeAgo(ci.created_at) : formatShort(ci.checkin_date)}</span>
+          <span className="muted" style={{ fontSize: "var(--t-sub)" }}><b style={{ color: "var(--ink)" }}>{mineCi ? "You" : ci.profiles?.display_name}</b> · {ci.checkin_date === t ? timeAgo(ci.created_at) : formatShort(ci.checkin_date)}</span>
           <span style={{ fontSize: 14.5, fontWeight: 700 }}>{ci.title}{ci.amount ? ` · ${fmt(ci.amount)} ${c.unit ?? ""}` : ""}</span>
-          {ci.comment && <span className="muted" style={{ fontSize: 12.5 }}>{ci.comment}</span>}
+          {ci.comment && <span className="muted" style={{ fontSize: "var(--t-sub)" }}>{ci.comment}</span>}
         </button>
         {ci.photo_path && photos[ci.photo_path] && <img src={photos[ci.photo_path]} alt="" style={{ width: 52, height: 52, borderRadius: 14, objectFit: "cover" }} />}
         {group && <button aria-label={liked ? "Unlike" : "Like"} aria-pressed={liked} onClick={() => like(ci)} style={{ border: 0, background: "none", display: "flex", alignItems: "center", gap: 3, fontSize: 12.5, fontWeight: 700, color: "var(--ink-2)", padding: 4 }}>
@@ -342,7 +342,7 @@ function ChallengePage({ id }: { id: string }) {
       {!finished && (
         <button className="soft" onClick={makeGroup} style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 24, border: 0, textAlign: "left" }}>
           <span style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="users" /></span>
-          <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>Make it a group challenge</span><span className="muted" style={{ display: "block", fontSize: 12.5 }}>Invite friends. Your progress so far is kept.</span></span>
+          <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>Make it a group challenge</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>Invite friends. Your progress so far is kept.</span></span>
           <Icon name="right" size={16} />
         </button>
       )}
@@ -433,20 +433,20 @@ function ChallengePage({ id }: { id: string }) {
           <div className="card group">
             {group ? (
               <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setMenu(false); setInviteOpen(true); }}>
-                <Icon name="users" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Invite friends</div></button>
+                <Icon name="users" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Invite friends</div></button>
             ) : (
               <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setMenu(false); makeGroup(); }}>
-                <Icon name="users" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Make it a group challenge</div><div className="muted" style={{ fontSize: 12 }}>Your progress so far is kept</div></div></button>
+                <Icon name="users" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Make it a group challenge</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Your progress so far is kept</div></div></button>
             )}
-            {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
+            {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
             {isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewStart(c!.starts_on); setMenu(false); setStartOpen(true); }}>
-              <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: 12 }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
+              <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
             {group && isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={newLink}>
-              <Icon name="shield" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Make a new invite link</div><div className="muted" style={{ fontSize: 12 }}>The old link stops working</div></div></button>}
+              <Icon name="shield" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Make a new invite link</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>The old link stops working</div></div></button>}
             {!isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={leave}>
-              <Icon name="logout" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Leave challenge</div><div className="muted" style={{ fontSize: 12 }}>Your check-ins stay in the group&apos;s history</div></div></button>}
+              <Icon name="logout" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Leave challenge</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Your check-ins stay in the group&apos;s history</div></div></button>}
             {isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={remove}>
-              <Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Delete challenge</div><div className="muted" style={{ fontSize: 12 }}>{group ? "For everyone. " : ""}Can&apos;t be undone.</div></div></button>}
+              <Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Delete challenge</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{group ? "For everyone. " : ""}Can&apos;t be undone.</div></div></button>}
           </div>
         </Sheet>
       </>
@@ -463,20 +463,20 @@ function Leaderboard({ c, st, userId, finished }: { c: Challenge; st: Standing[]
   const rows = rule === "finishers" ? [...st].sort((a, b) => b.progress - a.progress) : st;
   return (
     <>
-      <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>{explain}</div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{explain}</div>
       {rows.map((s, i) => {
         const isMe = s.user_id === userId;
         const bar = rule === "most" ? (rows[0].value ? (s.value / rows[0].value) * 100 : 0) : rule === "finishers" ? s.progress : s.consistency;
         const tag = rule === "finishers" ? (s.finished ? "Made it" : null) : i === 0 && s.value > 0 ? (finished ? "Winner" : "Leading") : null;
         return (
           <div key={s.user_id} className={isMe ? "" : "card"} style={{ borderRadius: 20, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, background: isMe ? "var(--soft-l)" : undefined }}>
-            {rule !== "finishers" && <span className="muted" style={{ width: 18, fontSize: 15, fontWeight: 800 }}>{i + 1}</span>}
+            {rule !== "finishers" && <span className="muted" style={{ width: 18, fontSize: "var(--t-title)", fontWeight: 800 }}>{i + 1}</span>}
             <Avatar name={s.name} path={s.avatar_path} size={38} />
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 15, fontWeight: 800 }}>{isMe ? "You" : s.name}</span>
+                <span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>{isMe ? "You" : s.name}</span>
                 {tag && <span className="tag tag-accent" style={{ display: "flex", alignItems: "center", gap: 3, fontWeight: 800 }}><Icon name={tag === "Made it" ? "check" : "trophy"} size={12} color="var(--accent)" stroke={2.2} />{tag}</span>}
-                <span style={{ marginLeft: "auto", fontSize: 15, fontWeight: 800 }}>{rule === "finishers" ? `${s.progress}%` : s.display}</span>
+                <span style={{ marginLeft: "auto", fontSize: "var(--t-title)", fontWeight: 800 }}>{rule === "finishers" ? `${s.progress}%` : s.display}</span>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: "var(--soft)", position: "relative" }}>
                 <div style={{ width: `${Math.min(100, bar)}%`, height: 6, borderRadius: 3, background: "var(--primary)" }} />
@@ -500,7 +500,7 @@ function GroupStats({ c, st, checkins, members }: { c: Challenge; st: Standing[]
   const perWeek = weeks.filter((w) => !w.isFuture).map((w) => ({ w, n: checkins.filter((x) => x.checkin_date >= w.from && x.checkin_date <= w.to).length }));
   const max = Math.max(1, ...perWeek.map((p) => p.n));
   const avg = st.length ? Math.round(st.reduce((a, s) => a + s.progress, 0) / st.length) : 0;
-  const tile = (v: string | number, l: string) => <div className="card" style={{ padding: 14, borderRadius: 20 }}><div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{v}</div><div className="muted" style={{ fontSize: 12 }}>{l}</div></div>;
+  const tile = (v: string | number, l: string) => <div className="card" style={{ padding: 14, borderRadius: 20 }}><div className="font-display" style={{ fontSize: 24, fontWeight: 600 }}>{v}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{l}</div></div>;
   const longest = [...st].sort((a, b) => b.longestStreak - a.longestStreak)[0];
   const most = [...st].sort((a, b) => b.checkins - a.checkins)[0];
   const photosTop = [...st].sort((a, b) => b.photos - a.photos)[0];
@@ -515,7 +515,7 @@ function GroupStats({ c, st, checkins, members }: { c: Challenge; st: Standing[]
       </div>
       {perWeek.length > 0 && (
         <section className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: 15, fontWeight: 800 }}>Check-ins per week</span><span className="muted" style={{ fontSize: 12 }}>everyone together</span></div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>Check-ins per week</span><span className="muted" style={{ fontSize: "var(--t-sub)" }}>everyone together</span></div>
           <div role="img" aria-label="Check-ins per week" style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 90 }}>
             {perWeek.map((p, i) => <div key={i} title={`${formatShort(p.w.from)}: ${p.n}`} style={{ flex: 1, height: `${Math.max(4, (p.n / max) * 100)}%`, borderRadius: 6, background: p.w.isCurrent ? "var(--primary)" : "var(--primary-l)" }} />)}
           </div>
@@ -523,9 +523,9 @@ function GroupStats({ c, st, checkins, members }: { c: Challenge; st: Standing[]
         </section>
       )}
       <section className="card group">
-        {c.show_longest_streak && longest && longest.longestStreak > 0 && <div className="row"><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Longest streak</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 800 }}><Flame size={16} />{longest.name} · {longest.longestStreak} {longest.streakUnit}</span></div>}
-        {c.show_most_checkins && most && most.checkins > 0 && <div className="row"><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Most check-ins</div><span style={{ fontSize: 14, fontWeight: 800 }}>{most.name} · {most.checkins}</span></div>}
-        {c.show_most_photos && photosTop && photosTop.photos > 0 && <div className="row"><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Most photos</div><span style={{ fontSize: 14, fontWeight: 800 }}>{photosTop.name} · {photosTop.photos}</span></div>}
+        {c.show_longest_streak && longest && longest.longestStreak > 0 && <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Longest streak</div><span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 800 }}><Flame size={16} />{longest.name} · {longest.longestStreak} {longest.streakUnit}</span></div>}
+        {c.show_most_checkins && most && most.checkins > 0 && <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Most check-ins</div><span style={{ fontSize: 14, fontWeight: 800 }}>{most.name} · {most.checkins}</span></div>}
+        {c.show_most_photos && photosTop && photosTop.photos > 0 && <div className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Most photos</div><span style={{ fontSize: 14, fontWeight: 800 }}>{photosTop.name} · {photosTop.photos}</span></div>}
       </section>
     </>
   );
@@ -622,7 +622,7 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink }: { open:
           {friends.map((f) => (
             <div key={f.id} className="row">
               <Avatar name={f.display_name} path={f.avatar_path} size={38} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{f.display_name}</div><div className="muted" style={{ fontSize: 12 }}>{f.shared} challenge{f.shared > 1 ? "s" : ""} together</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{f.display_name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{f.shared} challenge{f.shared > 1 ? "s" : ""} together</div></div>
               {sent.has(f.id) ? <span className="muted" style={{ fontSize: 13, fontWeight: 800 }}>Invited</span>
                 : <button className="btn btn-primary btn-sm" onClick={() => invite(f.id)}>Invite</button>}
             </div>

@@ -53,8 +53,8 @@ export default function Archive() {
             {habits.map((h) => (
               <div key={h.id} className="row">
                 <Link href={`/habits/${h.id}`} style={{ flex: 1, minWidth: 0, color: "inherit", textDecoration: "none" }}>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>{h.name}</div>
-                  <div className="muted" style={{ fontSize: 12.5 }}>{frequencyLabel(h)} · archived {formatShort(h.archived_at!.slice(0, 10))}</div>
+                  <div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{h.name}</div>
+                  <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{frequencyLabel(h)} · archived {formatShort(h.archived_at!.slice(0, 10))}</div>
                 </Link>
                 <button className="btn btn-soft btn-sm" disabled={busy === h.id} onClick={() => restore(h)}>Restore</button>
                 <button className="icon-btn" aria-label={`Delete ${h.name}`} onClick={() => setDel(h)} style={{ width: 40, height: 40, boxShadow: "none", background: "none" }}><Icon name="trash" size={18} /></button>

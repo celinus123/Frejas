@@ -1,29 +1,33 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useApp } from "@/components/AppProvider";
-import { Cover } from "@/components/Cover";
-import { Flame, Icon } from "@/components/Icon";
-import { Ring } from "@/components/Ring";
+import { Icon } from "@/components/Icon";
 import { Avatar, Empty, Sheet } from "@/components/ui";
+import { PostCard, PostSheet, Tile, type FeedPost, type Who } from "@/components/FeedPost";
 import { supabase } from "@/lib/supabase";
-import { friendUrl, loadChallenge, loadFeed, loadHabits, myChallenges, myFriends, removeFriend, shareLink, toggleLike, type Friend, type MyChallenge } from "@/lib/data";
-import { challengeCards, friendDayCards, goalCards, recapCards, type FunCard, type Who } from "@/lib/feedCards";
+import { friendUrl, loadChallenge, loadFeed, loadHabits, myChallenges, myFriends, removeFriend, shareLink, type Friend, type MyChallenge } from "@/lib/data";
+import { challengeCards, friendDayCards, goalCards, recapCards, type FunCard, type Who as CardWho } from "@/lib/feedCards";
+import { addComment, loadDaySocial, loadPeople, noSocial, react, refKey, removeComment, type Person, type PostRef, type Social } from "@/lib/social";
+import { D, type Emoji } from "@/lib/design";
 import { signedUrls } from "@/lib/photos";
-import { fmt } from "@/lib/scoring";
-import { addDays, iso, parse, timeAgo, today } from "@/lib/dates";
+import { addDays, iso, parse, today } from "@/lib/dates";
 import type { CheckIn, Habit } from "@/lib/types";
 
-type Item = { kind: "checkin"; at: string; ci: CheckIn } | { kind: "card"; at: string; card: FunCard };
+type Item = { at: string; key: string; h: number; node: ReactNode };
 
 export default function Feed() {
   const { userId, profile, refreshProfile, toast } = useApp();
-  const [items, setItems] = useState<CheckIn[] | null>(null);
+  const [posts, setPosts] = useState<FeedPost[] | null>(null);
+  const [social, setSocial] = useState<Record<string, Social>>({});
+  const [people, setPeople] = useState<Record<string, Person>>({});
   const [cards, setCards] = useState<FunCard[]>([]);
   const [chs, setChs] = useState<MyChallenge[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [filter, setFilter] = useState<string>("all");
   const [photos, setPhotos] = useState<Record<string, string>>({});
+  const [picker, setPicker] = useState<string | null>(null);   // the post whose reaction picker is open
+  const [openKey, setOpenKey] = useState<string | null>(null); // the post that is opened
   const [addOpen, setAddOpen] = useState(false);
   const [friendSheet, setFriendSheet] = useState<Friend | null>(null);
   const t = today();
@@ -32,12 +36,13 @@ export default function Feed() {
     if (!userId) return;
     const d = parse(t);
     const since = iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)) < addDays(t, -40) ? iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)) : addDays(t, -40);
-    const [f, c, fr, mh, ml] = await Promise.all([
+    const [f, c, fr, mh, ml, ds] = await Promise.all([
       loadFeed(80), myChallenges(userId), myFriends(userId), loadHabits(userId),
       supabase().from("habit_logs").select("habit_id, log_date, created_at").eq("user_id", userId).gte("log_date", since),
+      loadDaySocial(addDays(t, -7)),
     ]);
-    setItems(f); setChs(c); setFriends(fr);
-    setPhotos(await signedUrls("photos", f.map((x) => x.photo_path)));
+    setChs(c); setFriends(fr);
+    signedUrls("photos", f.map((x) => x.photo_path)).then(setPhotos).catch(() => {});
 
     // friends' shared habits and their ticks (row security only returns what they share with you)
     const ids = fr.map((x) => x.id);
@@ -52,40 +57,90 @@ export default function Feed() {
     const relevant = c.filter((x) => x.challenge.status !== "draft" && ((x.challenge.ends_on < t && x.challenge.ends_on >= addDays(t, -14)) || (x.challenge.starts_on <= t && x.challenge.ends_on >= t && !x.challenge.solo)));
     const cd = await Promise.all(relevant.map((x) => loadChallenge(x.challenge.id)));
 
-    const whoOf = (owner: string): Who => owner === userId
+    const whoOf = (owner: string): CardWho => owner === userId
       ? { id: owner, name: "You", path: profile?.avatar_path ?? null, you: true }
       : { id: owner, name: fr.find((x) => x.id === owner)?.display_name ?? "A friend", path: fr.find((x) => x.id === owner)?.avatar_path ?? null, you: false };
     const myLogs = (ml.data ?? []) as { habit_id: string; log_date: string; created_at: string }[];
+    const byId = Object.fromEntries(c.map((x) => [x.challenge.id, x.challenge]));
+
+    // posts: check-ins, and one card per person per day for the habits they share
+    const list: FeedPost[] = f.map((ci) => ({ key: `c:${ci.id}`, ref: { kind: "checkin", id: ci.id }, at: ci.created_at, authorId: ci.user_id, ci, challenge: byId[ci.challenge_id] }));
+    for (const card of friendDayCards(shared, [...myLogs, ...fl], whoOf)) {
+      if (card.kind !== "friendDay") continue;
+      list.push({ key: `d:${card.who.id}:${card.date}`, ref: { kind: "day", owner: card.who.id, day: card.date }, at: card.at, authorId: card.who.id, date: card.date, habits: card.habits });
+    }
+    const soc: Record<string, Social> = { ...ds };
+    for (const ci of f) soc[`c:${ci.id}`] = { reactions: (ci.reactions ?? []).map((r) => ({ user_id: r.user_id, emoji: r.emoji ?? "❤️" })), comments: [...(ci.comments ?? [])].sort((a, b) => a.created_at.localeCompare(b.created_at)) };
+
+    // names: you, your friends, authors of check-ins; anyone else who wrote on a card you can see is looked up
+    const known: Record<string, Person> = {};
+    for (const x of fr) known[x.id] = { name: x.display_name, path: x.avatar_path };
+    for (const ci of f) if (ci.profiles) known[ci.user_id] = { name: ci.profiles.display_name, path: ci.profiles.avatar_path };
+    const seen = new Set<string>();
+    for (const v of Object.values(soc)) { for (const r of v.reactions) seen.add(r.user_id); for (const m of v.comments) seen.add(m.user_id); }
+    const unknown = [...seen].filter((id) => id !== userId && !known[id]);
+    const extra = await loadPeople(unknown).catch(() => ({}));
+
+    setPeople({ ...extra, ...known });
+    setSocial(soc);
+    setPosts(list);
     setCards([
       ...recapCards(mh, myLogs),
       ...goalCards([...mh, ...fh], [...myLogs, ...fl], whoOf),
-      ...friendDayCards(shared, [...myLogs, ...fl], whoOf),
       ...challengeCards(cd.filter((x) => x.challenge).map((x) => ({ challenge: x.challenge!, members: x.members, checkins: x.checkins })), userId),
     ]);
   }, [userId, t, profile?.avatar_path]);
-  useEffect(() => { load().catch(() => setItems([])); }, [load]);
+  useEffect(() => { load().catch(() => setPosts((p) => p ?? [])); }, [load]);
 
-  // stay current: new check-ins and shared ticks arrive live, and coming back to the app refreshes
+  // stay current: check-ins, shared ticks, reactions and comments arrive live, and coming back to the app refreshes
   useEffect(() => {
     if (!userId) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const soon = () => { if (timer) clearTimeout(timer); timer = setTimeout(() => load().catch(() => {}), 800); };
     const sb = supabase();
-    const ch = sb.channel(`feed-${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "check_ins" }, soon)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "habit_logs" }, soon)
-      .subscribe();
+    let ch = sb.channel(`feed-${userId}`).on("postgres_changes", { event: "INSERT", schema: "public", table: "habit_logs" }, soon);
+    for (const table of ["check_ins", "reactions", "comments", "day_reactions", "day_comments"]) ch = ch.on("postgres_changes", { event: "*", schema: "public", table }, soon);
+    ch.subscribe();
     const onVis = () => { if (document.visibilityState === "visible") soon(); };
     document.addEventListener("visibilitychange", onVis);
     return () => { sb.removeChannel(ch); document.removeEventListener("visibilitychange", onVis); if (timer) clearTimeout(timer); };
   }, [userId, load]);
 
-  const names = Object.fromEntries(chs.map((c) => [c.challenge.id, c.challenge]));
+  // a tap anywhere else closes the reaction picker
+  useEffect(() => {
+    if (!picker) return;
+    const close = (e: PointerEvent) => { if (!(e.target as HTMLElement).closest?.(".picker, .rbtn")) setPicker(null); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [picker]);
 
-  async function like(ci: CheckIn) {
-    const liked = !!ci.reactions?.some((r) => r.user_id === userId);
-    setItems((xs) => xs && xs.map((x) => x.id === ci.id ? { ...x, reactions: liked ? x.reactions?.filter((r) => r.user_id !== userId) : [...(x.reactions ?? []), { user_id: userId! }] } : x));
-    await toggleLike(ci.id, userId!, liked);
+  const who: Who = useCallback((id: string) => id === userId
+    ? { name: profile?.display_name ?? "You", path: profile?.avatar_path ?? null, you: true }
+    : { ...(people[id] ?? { name: "A friend", path: null }), you: false }, [userId, profile, people]);
+
+  const patch = (key: string, fn: (s: Social) => Social) => setSocial((all) => ({ ...all, [key]: fn(all[key] ?? noSocial) }));
+
+  async function onReact(ref: PostRef, emoji: Emoji | null) {
+    if (!userId) return;
+    const key = refKey(ref);
+    const before = social[key] ?? noSocial;
+    const had = before.reactions.some((r) => r.user_id === userId);
+    setPicker(null);
+    patch(key, (s) => ({ ...s, reactions: [...s.reactions.filter((r) => r.user_id !== userId), ...(emoji ? [{ user_id: userId, emoji }] : [])] }));
+    try { await react(ref, userId, emoji, had); }
+    catch { patch(key, (s) => ({ ...s, reactions: before.reactions })); toast({ text: "Couldn't save your reaction. Try again." }); }
+  }
+  async function onComment(ref: PostRef, body: string) {
+    if (!userId) return;
+    const c = await addComment(ref, userId, body);
+    patch(refKey(ref), (s) => ({ ...s, comments: [...s.comments, c] }));
+  }
+  async function onDelete(ref: PostRef, id: string) {
+    const key = refKey(ref);
+    const before = social[key] ?? noSocial;
+    patch(key, (s) => ({ ...s, comments: s.comments.filter((x) => x.id !== id) }));
+    try { await removeComment(ref, id); }
+    catch { patch(key, (s) => ({ ...s, comments: before.comments })); toast({ text: "Couldn't delete the comment." }); }
   }
 
   async function shareFriendLink() {
@@ -107,145 +162,27 @@ export default function Feed() {
     load();
   }
 
-  // ---------------------------------------------------------------- the timeline
-  const shownCheckins = (items ?? []).filter((x) => filter === "all" || x.challenge_id === filter);
-  const timeline: Item[] = [
-    ...shownCheckins.map((ci) => ({ kind: "checkin" as const, at: ci.created_at, ci })),
-    ...(filter === "all" ? cards.map((card) => ({ kind: "card" as const, at: card.at, card })) : []),
-  ].sort((a, b) => b.at.localeCompare(a.at));
-
-  const checkinCard = (x: CheckIn) => {
-    const liked = !!x.reactions?.some((r) => r.user_id === userId);
-    const c = names[x.challenge_id];
-    const who = (
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <Avatar name={x.profiles?.display_name ?? ""} path={x.profiles?.avatar_path} size={22} />
-        <span style={{ fontSize: 12, fontWeight: 800 }}>{x.user_id === userId ? "You" : x.profiles?.display_name}</span>
-        <span className="muted" style={{ fontSize: 11.5 }}>{timeAgo(x.created_at)}</span>
-      </div>
-    );
-    const meta = (
-      <div className="muted" style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 12.5, fontWeight: 700 }}>
-        <button aria-label={liked ? "Unlike" : "Like"} aria-pressed={liked} onClick={() => like(x)} style={{ border: 0, background: "none", padding: 0, display: "flex", alignItems: "center", gap: 4, color: "inherit" }}>
-          <Icon name="heart" size={16} color={liked ? "var(--accent)" : "currentColor"} fill={liked ? "var(--flame-fill)" : "none"} />{x.reactions?.length ?? 0}
-        </button>
-      </div>
-    );
-    const tick = (s: number) => <div aria-label="Checked in" style={{ width: s, height: s, borderRadius: "50%", background: "var(--primary)", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="check" size={Math.round(s * 0.56)} stroke={2.6} /></div>;
-    const title = <div style={{ fontSize: 14, fontWeight: 800 }}>{x.title}{x.amount ? ` · ${fmt(x.amount)} ${c?.unit ?? ""}` : ""}</div>;
-    const tag = c && <Link href={`/challenges/${c.id}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)", textDecoration: "none" }}>{c.name}{c.solo ? " · just you" : ""}</Link>;
-    if (x.photo_path) return (
-      <div key={x.id} className="card" style={{ borderRadius: 22, overflow: "hidden" }}>
-        <div style={{ position: "relative", background: "var(--soft)", aspectRatio: "4 / 5" }}>
-          {photos[x.photo_path] && <img src={photos[x.photo_path]} alt={x.title} style={{ width: "100%", display: "block", aspectRatio: "4 / 5", objectFit: "cover" }} />}
-          <div style={{ position: "absolute", top: 8, left: 8 }}>{tick(24)}</div>
-        </div>
-        <div style={{ padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
-          {who}{title}{x.comment && <div className="muted" style={{ fontSize: 12.5, lineHeight: 1.35 }}>{x.comment}</div>}{tag}{meta}
-        </div>
-      </div>
-    );
-    return (
-      <div key={x.id} className="soft" style={{ borderRadius: 22, padding: "14px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>{who}{tick(22)}</div>
-        {x.comment && <div className="font-display" style={{ fontSize: 17, fontWeight: 500, lineHeight: 1.3 }}>{x.comment}</div>}
-        {title}{tag}{meta}
-      </div>
-    );
-  };
-
-  const small = (text: string) => <span className="muted" style={{ fontSize: 11.5 }}>{text}</span>;
-  const funCard = (card: FunCard): ReactNode => {
-    switch (card.kind) {
-      case "week":
-        return (
-          <section key={card.id} style={{ borderRadius: 24, padding: "16px 18px", background: "var(--hero)", color: "var(--on-hero)", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 800, color: "var(--hero-ring)" }}>Your week in review</div>
-              <div className="font-display" style={{ fontSize: 24, fontWeight: 600, lineHeight: 1.15 }}>{card.pct >= 90 ? "What a week!" : card.pct >= 70 ? "Solid week." : card.pct >= 40 ? "Good going." : "New week, fresh start."}</div>
-              <div style={{ fontSize: 13, opacity: 0.85 }}>{card.ticks} ticks{card.best ? ` · most often ${card.best}` : ""}{card.bonus ? ` · +${card.bonus} bonus` : ""}</div>
-            </div>
-            <Ring size={70} stroke={7} pct={card.pct} track="rgba(255, 255, 255, 0.16)" color="var(--hero-ring)"><span style={{ fontSize: 15, fontWeight: 800 }}>{card.pct}%</span></Ring>
-          </section>
-        );
-      case "month":
-        return (
-          <section key={card.id} className="soft" style={{ borderRadius: 24, padding: "16px 18px", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 800 }} className="muted">Your {card.month}</div>
-              <div className="font-display" style={{ fontSize: 22, fontWeight: 600 }}>{card.pct}% of your habits done</div>
-              <div className="muted" style={{ fontSize: 13 }}>{card.ticks} ticks in {card.month}</div>
-            </div>
-            <Icon name="calendar" size={30} color="var(--primary)" />
-          </section>
-        );
-      case "goal":
-        return (
-          <section key={card.id} className="card" style={{ borderRadius: 22, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 14, background: "var(--accent-bg)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Flame size={22} /></div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, lineHeight: 1.35 }}><b>{card.who.name}</b> hit the {card.monthly ? "monthly" : "weekly"} goal for <b>{card.habit}</b>{card.target > 1 ? ` · ${card.target}×` : ""}</div>
-              {small(timeAgo(card.at))}
-            </div>
-            {!card.who.you && <Avatar name={card.who.name} path={card.who.path} size={30} />}
-          </section>
-        );
-      case "friendDay":
-        return (
-          <section key={card.id} className="card" style={{ borderRadius: 22, padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <Avatar name={card.who.you ? profile?.display_name ?? "" : card.who.name} path={card.who.path} size={36} />
-            <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ fontSize: 14 }}><b>{card.who.name}</b> did {card.habits.length === 1 ? "a habit" : `${card.habits.length} habits`} {card.date === t ? "today" : card.date === addDays(t, -1) ? "yesterday" : `on ${parse(card.date).toLocaleDateString("en-GB", { weekday: "long" })}`}</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {card.habits.slice(0, 4).map((n) => <span key={n} className="tag" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Icon name="check" size={12} stroke={2.6} />{n}</span>)}
-                {card.habits.length > 4 && <span className="tag">+{card.habits.length - 4}</span>}
-              </div>
-            </div>
-          </section>
-        );
-      case "finished":
-        return (
-          <Link key={card.id} href={`/challenges/${card.challenge.id}`} className="card" style={{ borderRadius: 24, overflow: "hidden", display: "flex", color: "inherit", textDecoration: "none" }}>
-            <Cover preset={card.challenge.cover_preset} path={card.challenge.cover_path} width={96} height={110} />
-            <div style={{ flex: 1, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 4, justifyContent: "center" }}>
-              <span className="tag tag-accent" style={{ alignSelf: "flex-start", display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 800 }}><Icon name="trophy" size={12} color="var(--accent)" />{card.you ? "Well done" : "Challenge over"}</span>
-              <div className="font-display" style={{ fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>{card.headline}</div>
-              {card.sub && <div className="muted" style={{ fontSize: 12.5 }}>{card.sub}</div>}
-            </div>
-          </Link>
-        );
-      case "leading":
-        return (
-          <Link key={card.id} href={`/challenges/${card.challenge.id}`} className="soft" style={{ borderRadius: 22, padding: "12px 14px", display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}>
-            <div style={{ position: "relative" }}>
-              <Avatar name={card.who.name} path={card.who.path} size={40} />
-              <span style={{ position: "absolute", right: -4, bottom: -4, width: 20, height: 20, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="trophy" size={12} color="var(--accent)" /></span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14 }}><b>{card.who.you ? "You're" : `${card.who.name} is`}</b> leading <b>{card.challenge.name}</b></div>
-              <div className="muted" style={{ fontSize: 12.5 }}>{card.value} · {card.who.you ? "keep it up" : "time to catch up?"}</div>
-            </div>
-            <Icon name="right" size={16} color="var(--ink-2)" />
-          </Link>
-        );
+  // ---------------------------------------------------------------- the timeline: everything in two columns, newest first
+  const columns = useMemo(() => {
+    const items: Item[] = [];
+    for (const p of posts ?? []) {
+      if (filter !== "all" && p.ci?.challenge_id !== filter) continue;
+      const s = social[p.key] ?? noSocial;
+      const h = p.habits ? 120 + Math.min(5, p.habits.length) * 26 : p.ci?.photo_path ? 290 : 130 + (p.ci?.comment?.length ?? 0) * 0.5;
+      items.push({ at: p.at, key: p.key, h: h + (s.comments.length ? 26 : 0), node: (
+        <PostCard key={p.key} post={p} uid={userId ?? ""} who={who} photo={p.ci?.photo_path ? photos[p.ci.photo_path] : undefined} social={s}
+          pickerOpen={picker === p.key} setPicker={(o) => setPicker(o ? p.key : null)} onReact={(e) => onReact(p.ref, e)} onOpen={() => { setPicker(null); setOpenKey(p.key); }} />
+      ) });
     }
-  };
+    if (filter === "all") for (const c of cards) if (c.kind !== "friendDay") items.push({ at: c.at, key: c.id, h: c.kind === "finished" ? 200 : 170, node: <Tile key={c.id} card={c} /> });
+    items.sort((a, b) => b.at.localeCompare(a.at));
+    const cols: ReactNode[][] = [[], []], hs = [0, 0];
+    for (const it of items) { const i = hs[0] <= hs[1] ? 0 : 1; cols[i].push(it.node); hs[i] += it.h + D.card.colGap; }
+    return { cols, count: items.length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts, cards, social, photos, filter, picker, who, userId]);
 
-  // check-ins sit in two columns; full-width cards break the columns where they fall in time
-  const blocks: ReactNode[] = [];
-  let run: CheckIn[] = [];
-  const flush = (key: string) => {
-    if (!run.length) return;
-    const cols: CheckIn[][] = [[], []], hs = [0, 0];
-    for (const x of run) { const i = hs[0] <= hs[1] ? 0 : 1; cols[i].push(x); hs[i] += (x.photo_path ? 190 : 110) + (x.comment?.length ?? 0) * 0.4; }
-    blocks.push(<div key={key} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>{cols.map((col, i) => <div key={i} style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>{col.map(checkinCard)}</div>)}</div>);
-    run = [];
-  };
-  for (const it of timeline) {
-    if (it.kind === "checkin") run.push(it.ci);
-    else { flush(`run-${it.card.id}`); blocks.push(funCard(it.card)); }
-  }
-  flush("run-end");
+  const opened = openKey ? (posts ?? []).find((p) => p.key === openKey) ?? null : null;
 
   return (
     <main className="page" style={{ paddingLeft: 16, paddingRight: 16 }}>
@@ -256,13 +193,13 @@ export default function Feed() {
 
       <div className="no-scrollbar" style={{ display: "flex", gap: 14, overflowX: "auto", margin: "0 -16px", padding: "4px 20px 2px" }} aria-label="Friends">
         <button onClick={() => setAddOpen(true)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: 56 }}>
-          <span style={{ width: 52, height: 52, borderRadius: "50%", border: "2px dashed var(--primary-l)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="plus" size={20} stroke={2.2} /></span>
-          <span style={{ fontSize: 11.5, fontWeight: 700 }}>Add</span>
+          <span style={{ width: D.avatar.friend, height: D.avatar.friend, borderRadius: "50%", border: "2px dashed var(--primary-l)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="plus" size={20} stroke={2.2} /></span>
+          <span className="t-meta" style={{ fontWeight: 700 }}>Add</span>
         </button>
         {friends.map((f) => (
           <button key={f.id} onClick={() => setFriendSheet(f)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: 56, color: "inherit" }}>
-            <Avatar name={f.display_name} path={f.avatar_path} size={52} />
-            <span style={{ fontSize: 11.5, fontWeight: 700, maxWidth: 56, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.display_name.split(" ")[0]}</span>
+            <Avatar name={f.display_name} path={f.avatar_path} size={D.avatar.friend} />
+            <span className="t-meta" style={{ fontWeight: 700, maxWidth: 56, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.display_name.split(" ")[0]}</span>
           </button>
         ))}
         {friends.length === 0 && <div className="muted" style={{ fontSize: 13, alignSelf: "center", lineHeight: 1.4, maxWidth: 220 }}>Add friends to see their check-ins and the habits they share.</div>}
@@ -275,11 +212,18 @@ export default function Feed() {
         </div>
       )}
 
-      {items === null ? <div className="skeleton" style={{ height: 400 }} /> : timeline.length === 0 ? (
+      {posts === null ? <div className="skeleton" style={{ height: 400 }} /> : columns.count === 0 ? (
         <Empty icon="feed" title="Nothing here yet" text="Check-ins from your challenges, your weekly recap and what friends share show up here. Private habits never do.">
           <button className="btn btn-primary" onClick={() => setAddOpen(true)}><Icon name="users" />Add a friend</button>
         </Empty>
-      ) : blocks}
+      ) : (
+        <div className="feed-cols">{columns.cols.map((col, i) => <div key={i} className="feed-col">{col}</div>)}</div>
+      )}
+
+      {opened && userId && (
+        <PostSheet post={opened} uid={userId} who={who} photo={opened.ci?.photo_path ? photos[opened.ci.photo_path] : undefined} social={social[opened.key] ?? noSocial}
+          onClose={() => setOpenKey(null)} onReact={(e) => onReact(opened.ref, e)} onComment={(body) => onComment(opened.ref, body)} onDelete={(id) => onDelete(opened.ref, id)} />
+      )}
 
       <Sheet open={addOpen} onClose={() => setAddOpen(false)} label="Add a friend">
         <div className="h1" style={{ fontSize: 24 }}>Add a friend</div>

@@ -98,7 +98,7 @@ export default function Challenges() {
         style={{ padding: 12, borderRadius: 24, display: "flex", alignItems: "center", gap: 14, color: "inherit", textDecoration: "none" }}>
         <Cover preset={c.cover_preset} path={c.cover_path} width={64} height={64} radius={18} />
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
-          <div className="muted" style={{ fontSize: 12, fontWeight: 700 }}>
+          <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>
             {c.solo ? "Just me" : "With friends"} · {daysLeft(c)} {daysLeft(c) === 1 ? "day" : "days"} left
           </div>
           <div className="font-display" style={{ fontSize: 19, fontWeight: 600, lineHeight: 1.15, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
@@ -139,7 +139,7 @@ export default function Challenges() {
                       <span><b>{inv.from?.display_name ?? "A friend"}</b> invited you</span>
                     </div>
                     <div className="font-display" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{c.name}</div>
-                    <div className="muted" style={{ fontSize: 12, fontWeight: 700 }}>
+                    <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>
                       {isV2(c) ? scheduleLabel(c) : c.goal_type === "own" ? "Own goals" : "Shared goal"} · {formatShort(c.starts_on)} – {formatShort(c.ends_on)}
                     </div>
                   </div>
@@ -170,7 +170,7 @@ export default function Challenges() {
                 <Cover preset={c.cover_preset} path={c.cover_path} width={52} height={52} radius={16} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
-                  <div className="muted" style={{ fontSize: 12, fontWeight: 700 }}>Starts {formatShort(c.starts_on)} · {isV2(c) ? scheduleLabel(c, r.me.times_per_week, r.me.goal_amount) : c.solo ? "Just me" : `${r.of} in it`}</div>
+                  <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>Starts {formatShort(c.starts_on)} · {isV2(c) ? scheduleLabel(c, r.me.times_per_week, r.me.goal_amount) : c.solo ? "Just me" : `${r.of} in it`}</div>
                 </div>
                 <div className="tag" style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "6px 10px", borderRadius: 14, background: "var(--soft)", lineHeight: 1.05 }}>
                   <span className="font-display" style={{ fontSize: 20, fontWeight: 600 }}>{n}</span>
@@ -190,8 +190,8 @@ export default function Challenges() {
               style={{ padding: 14, borderRadius: 22, border: "2px dashed var(--primary-l)", display: "flex", alignItems: "center", gap: 12, color: "inherit", textDecoration: "none" }}>
               <Icon name="draft" size={22} color="var(--ink-2)" />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 700 }}>{c.name || "Untitled challenge"}</div>
-                <div className="muted" style={{ fontSize: 12 }}>{c.solo ? "Just me" : "With friends"} · not started</div>
+                <div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{c.name || "Untitled challenge"}</div>
+                <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{c.solo ? "Just me" : "With friends"} · not started</div>
               </div>
               <span style={{ fontSize: 13.5, fontWeight: 800, color: "var(--primary)" }}>Continue</span>
             </Link>
@@ -211,8 +211,8 @@ export default function Challenges() {
               {finished.map((r) => (
                 <Link key={r.challenge.id} href={`/challenges/${r.challenge.id}`} className="row" style={{ color: "inherit", textDecoration: "none" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 15, fontWeight: 700 }}>{r.challenge.name}</div>
-                    <div className="muted" style={{ fontSize: 12 }}>
+                    <div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{r.challenge.name}</div>
+                    <div className="muted" style={{ fontSize: "var(--t-sub)" }}>
                       Ended {formatShort(r.challenge.ends_on)} · {r.challenge.solo ? `${r.mine?.done ?? 0} of ${r.mine?.target ?? 0} sessions` : r.challenge.win_rule === "finishers" && isV2(r.challenge) ? (r.won ? "You made it" : "Didn't make it this time") : `${ordinal(r.rank)} of ${r.of}`}
                     </div>
                   </div>

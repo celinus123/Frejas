@@ -28,7 +28,7 @@ export default function Profile() {
   }, [userId]);
 
   if (!profile) return null;
-  const stat = (v: React.ReactNode, l: string) => <div style={{ flex: 1, textAlign: "center" }}><div className="font-display" style={{ fontSize: 22, fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", gap: 4 }}>{v}</div><div className="muted" style={{ fontSize: 12 }}>{l}</div></div>;
+  const stat = (v: React.ReactNode, l: string) => <div style={{ flex: 1, textAlign: "center" }}><div className="font-display" style={{ fontSize: 22, fontWeight: 600, display: "flex", justifyContent: "center", alignItems: "center", gap: 4 }}>{v}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{l}</div></div>;
 
   return (
     <main className="page">
@@ -43,7 +43,7 @@ export default function Profile() {
       </section>
       <Link href="/archive" className="card row" style={{ color: "inherit", textDecoration: "none" }}>
         <Icon name="archive" color="var(--primary)" />
-        <span style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Archived habits</span>
+        <span style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Archived habits</span>
         <Icon name="right" size={16} color="var(--ink-2)" />
       </Link>
       <div className="label">Friends</div>
@@ -51,7 +51,7 @@ export default function Profile() {
         <section className="card group">
           {people.map((p) => (
             <div key={p.id} className="row"><Avatar name={p.display_name} path={p.avatar_path} size={40} />
-              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{p.display_name}</div><div className="muted" style={{ fontSize: 12.5 }}>{p.shared ? `${p.shared} challenge${p.shared > 1 ? "s" : ""} together` : "Friend"}</div></div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{p.display_name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{p.shared ? `${p.shared} challenge${p.shared > 1 ? "s" : ""} together` : "Friend"}</div></div></div>
           ))}
         </section>
       ) : <div className="muted" style={{ fontSize: 14, padding: "0 4px" }}>Add friends from the Feed with your friend link, or start a challenge together.</div>}

@@ -91,7 +91,7 @@ export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitI
         <span className="chip" aria-pressed="true"><Icon name="trophy" size={15} />{challenge.name}</span>
         {habitName && <span className="chip" aria-pressed="true"><Icon name="sun" size={15} />{habitName}</span>}
       </div>
-      {habitName && !existing && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", marginTop: -6 }}>Linked, so one check-in counts for both.</div>}
+      {habitName && !existing && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", marginTop: -6 }}>Linked, so one check-in counts for both.</div>}
 
       <div className="label">When</div>
       <div className="seg">
@@ -116,7 +116,7 @@ export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitI
             <span className="muted" style={{ fontSize: 16, fontWeight: 700 }}>{unitLabel}</span>
           </div>
           {!!minAmount && (
-            <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", marginTop: -4 }}>
+            <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", marginTop: -4 }}>
               Counts if {minAmount} {unitLabel} or more that day{amountNum !== null && amountNum > 0 && amountNum < minAmount ? " — you can still log it, and it adds up with other check-ins that day" : ""}.
             </div>
           )}

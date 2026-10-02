@@ -86,8 +86,8 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
           <Ring size={84} stroke={9} pct={100 * Math.min(1, monthDone / 4)}><span style={{ fontSize: 19, fontWeight: 800 }}>{monthDone}</span><span className="muted" style={{ fontSize: 10.5 }}>this month</span></Ring>
         )}
         <div style={{ flex: 1, display: "flex", gap: 8 }}>
-          {!flexible && <div style={{ flex: 1 }}><div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 18, fontWeight: 800 }}><Flame size={17} />{streak}</div><div className="muted" style={{ fontSize: 12 }}>streak</div></div>}
-          <div style={{ flex: 1 }}><div style={{ fontSize: 18, fontWeight: 800 }}>{logs.length}</div><div className="muted" style={{ fontSize: 12 }}>times in total</div></div>
+          {!flexible && <div style={{ flex: 1 }}><div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 18, fontWeight: 800 }}><Flame size={17} />{streak}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>streak</div></div>}
+          <div style={{ flex: 1 }}><div style={{ fontSize: 18, fontWeight: 800 }}>{logs.length}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>times in total</div></div>
         </div>
       </section>
 
@@ -112,7 +112,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
             );
           })}
         </div>
-        <div className="muted" style={{ fontSize: 12, padding: "0 4px" }}>Tap a past day to fill it in.</div>
+        <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Tap a past day to fill it in.</div>
       </section>
 
       {linked.length > 0 && (
@@ -120,7 +120,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
           {linked.map((c) => (
             <Link key={c.id} href={`/challenges/${c.id}`} className="row" style={{ color: "inherit", textDecoration: "none" }}>
               <Icon name="trophy" color="var(--primary)" />
-              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Counts toward</div><div className="muted" style={{ fontSize: 12.5 }}>{c.name}</div></div>
+              <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Counts toward</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{c.name}</div></div>
               <Icon name="right" size={16} color="var(--ink-2)" />
             </Link>
           ))}

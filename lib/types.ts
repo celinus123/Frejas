@@ -96,5 +96,6 @@ export interface CheckIn {
   amount: number | null;
   created_at: string;
   profiles?: { display_name: string; avatar_path: string | null } | null;
-  reactions?: { user_id: string }[];
+  reactions?: { user_id: string; emoji?: string }[];
+  comments?: { id: string; user_id: string; body: string; created_at: string }[];
 }

@@ -77,7 +77,7 @@ export default function Stats() {
 
   const tile = (bg: string, icon: React.ReactNode) => <div style={{ width: 38, height: 38, borderRadius: 14, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>;
   const stat = (icon: React.ReactNode, v: React.ReactNode, l: string) => (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>{icon}<div><div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>{v}</div><div className="muted" style={{ fontSize: 12 }}>{l}</div></div></div>
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>{icon}<div><div style={{ fontSize: 18, fontWeight: 800, lineHeight: 1.1 }}>{v}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{l}</div></div></div>
   );
   const flexible = habits.filter((h) => isFlexible(h) && habitStart(h) <= t);
   const scheduledHabits = habits.filter((h) => !isFlexible(h));
@@ -149,7 +149,7 @@ export default function Stats() {
               </div>
             </div>
           ))}
-          <div className="muted" style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12, padding: "10px 0" }}>
+          <div className="muted" style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: "var(--t-sub)", padding: "10px 0" }}>
             <span>● Done</span><span>○ Not yet</span><span>◌ Upcoming</span><span>– Not scheduled</span>
           </div>
         </section>
@@ -183,7 +183,7 @@ export default function Stats() {
               const c = logs.filter((l) => l.habit_id === h.id && l.log_date >= p.from && l.log_date <= p.to).length;
               return (
                 <div key={h.id} className="row">
-                  <div style={{ flex: 1 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{h.name}</div><div className="muted" style={{ fontSize: 12 }}>{frequencyLabel(h)} · {p.label.toLowerCase()}</div></div>
+                  <div style={{ flex: 1 }}><div style={{ fontSize: 14.5, fontWeight: 700 }}>{h.name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{frequencyLabel(h)} · {p.label.toLowerCase()}</div></div>
                   {c > p.target && <span className="tag tag-accent" style={{ fontWeight: 800 }}>+{c - p.target} bonus</span>}
                   <Ring size={40} stroke={4} pct={(Math.min(c, p.target) / p.target) * 100}><span style={{ fontSize: 11, fontWeight: 800 }}>{Math.min(c, p.target)}/{p.target}</span></Ring>
                 </div>
@@ -209,14 +209,14 @@ export default function Stats() {
                     const on = done.has(`${h.id}|${daySheet}`);
                     return (
                       <div key={h.id} className="row">
-                        <div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>{h.name}</div>
+                        <div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>{h.name}</div>
                         <button className="check" aria-pressed={on} aria-label={on ? `Undo ${h.name}` : `Mark ${h.name} done`} onClick={() => toggle(h, daySheet)}>{on && <Icon name="check" stroke={2.4} />}</button>
                       </div>
                     );
                   })}
                 </div>
               ) : <div className="muted" style={{ fontSize: 14 }}>No habits were scheduled this day.</div>}
-              <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>Forgot to log something? Tap to fill in the day.</div>
+              <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Forgot to log something? Tap to fill in the day.</div>
             </>
           );
         })()}

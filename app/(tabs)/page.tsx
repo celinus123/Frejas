@@ -10,6 +10,7 @@ import { SwipeRow } from "@/components/SwipeRow";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { CHALLENGES, CategoryFilter, categoriesOf, inCategory } from "@/components/CategoryFilter";
 import { similar } from "@/lib/similar";
+import { D } from "@/lib/design";
 import { celebrate, tap } from "@/lib/native";
 import { supabase } from "@/lib/supabase";
 import { addDays, dayFraction, flexPeriod, formatLong, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, parse, startOfWeek, today } from "@/lib/dates";
@@ -211,7 +212,7 @@ export default function Today() {
             <Icon name="repeat" color="var(--primary)" />
             <div style={{ flex: 1, fontSize: 14, lineHeight: 1.45 }}>
               <b>{suggestion.from.name}</b> and <b>{suggestion.into.name}</b> look like the same thing. Merge them into <b>{suggestion.into.name}</b>?
-              <div className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>All ticks from both are kept. Ticking {suggestion.into.name} counts for {suggestion.challenge}, and it keeps going after the challenge ends.</div>
+              <div className="muted" style={{ fontSize: "var(--t-sub)", marginTop: 4 }}>All ticks from both are kept. Ticking {suggestion.into.name} counts for {suggestion.challenge}, and it keeps going after the challenge ends.</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
@@ -245,8 +246,8 @@ export default function Today() {
           {scheduled.length > 0 && (
             <section style={{ padding: "16px 18px", borderRadius: 24, display: "flex", alignItems: "center", gap: 16, background: "var(--hero)", color: "var(--on-hero)" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--hero-ring)" }}>{isToday ? "Today's progress" : `Progress · ${formatShort(sel)}`}</div>
-                <div className="font-display" style={{ fontSize: 28, fontWeight: 600 }}>{doneToday} of {scheduled.length} done</div>
+                <div className="t-meta" style={{ fontWeight: 700, color: "var(--hero-ring)" }}>{isToday ? "Today's progress" : `Progress · ${formatShort(sel)}`}</div>
+                <div className="font-display" style={{ fontSize: "var(--t-display)", fontWeight: 600 }}>{doneToday} of {scheduled.length} done</div>
               </div>
               <Ring size={76} stroke={8} pct={pct} track="rgba(255, 255, 255, 0.16)" color="var(--hero-ring)"><span style={{ fontSize: 17, fontWeight: 800 }}>{pct}%</span></Ring>
             </section>
@@ -255,9 +256,9 @@ export default function Today() {
           {scheduled.length > 0 && (
             <section style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}><h2 className="h2">{dayTitle}</h2>
-                {!isToday && <span className="muted" style={{ fontSize: 12.5, fontWeight: 700 }}>Tick what you did</span>}</div>
+                {!isToday && <span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>Tick what you did</span>}</div>
               {tip && (
-                <div className="muted" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, padding: "0 4px" }}>
+                <div className="muted" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "var(--t-sub)", padding: "0 4px" }}>
                   <span style={{ flex: 1 }}>Tip: swipe a habit to the left to edit or delete it. Tap a date above to fill in an earlier day.</span>
                   <button onClick={hideTip} aria-label="Hide tip" style={{ border: 0, background: "none", color: "inherit", padding: 4 }}><Icon name="x" size={16} /></button>
                 </div>
@@ -270,11 +271,11 @@ export default function Today() {
                     onEdit={() => router.push(`/habits/${h.id}/edit`)} onDelete={() => setDelHabit(h)}>
                   <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
                     <Link href={`/habits/${h.id}`} style={{ flex: 1, display: "flex", flexDirection: "column", gap: 3, color: "inherit", textDecoration: "none" }}>
-                      <span style={{ fontSize: 15, fontWeight: 700 }}>{h.name}</span>
-                      <span className="muted" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{h.name}</span>
+                      <span className="muted" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--t-sub)", flexWrap: "wrap" }}>
                         {frequencyLabel(h)}
                         {h.category && <span className="tag">{h.category}</span>}
-                        {card && <span style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 11.5, fontWeight: 700, color: "var(--primary)" }}><Icon name="trophy" size={13} />{card.challenge.name}</span>}
+                        {card && <span className="t-tag" style={{ display: "flex", alignItems: "center", gap: 3, color: "var(--primary)" }}><Icon name="trophy" size={D.icon.inline} />{card.challenge.name}</span>}
                       </span>
                     </Link>
                     <button className="check" aria-pressed={on} aria-label={on ? `Undo ${h.name}` : `Mark ${h.name} done`} onClick={() => toggle(h)}>
@@ -300,8 +301,8 @@ export default function Today() {
                     onEdit={() => router.push(`/habits/${h.id}/edit`)} onDelete={() => setDelHabit(h)}>
                   <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 9px 9px 16px", borderRadius: 20 }}>
                     <Link href={`/habits/${h.id}`} style={{ flex: 1, color: "inherit", textDecoration: "none" }}>
-                      <div style={{ fontSize: 15, fontWeight: 700 }}>{h.name}</div>
-                      <div className="muted" style={{ fontSize: 12.5 }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}
+                      <div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{h.name}</div>
+                      <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}
                         {count > p.target && <span className="tag tag-accent" style={{ marginLeft: 6, fontWeight: 800, color: "var(--ink)" }}>+{count - p.target} bonus</span>}</div>
                     </Link>
                     <button className="flex-check" aria-pressed={todayDone} onClick={() => toggle(h)}
@@ -329,7 +330,7 @@ export default function Today() {
             {shownCards.map((c, i) => (
               <Link key={c.challenge.id} href={`/challenges/${c.challenge.id}`} className={i === 0 ? "soft" : "card"}
                 style={{ width: 236, flexShrink: 0, padding: 16, borderRadius: 24, display: "flex", flexDirection: "column", gap: 12, color: "inherit", textDecoration: "none" }}>
-                <div className="muted" style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 700 }}>
+                <div className="muted" style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--t-sub)", fontWeight: 700 }}>
                   <span>{c.challenge.goal_type === "own" ? "Own goals" : "Shared goal"}</span><span>{daysLeft(c.challenge)} days left</span>
                 </div>
                 <div className="font-display" style={{ fontSize: 20, fontWeight: 600 }}>{c.challenge.name}</div>

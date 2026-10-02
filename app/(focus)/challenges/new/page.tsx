@@ -49,8 +49,8 @@ function Choice({ icon, title, sub, on, onClick }: { icon: string; title: string
   return (
     <button onClick={onClick} aria-pressed={on} style={{ flex: 1, padding: 14, borderRadius: 20, border: 0, textAlign: "left", background: on ? "var(--soft)" : "var(--surface)", boxShadow: on ? "inset 0 0 0 2px var(--primary)" : "var(--shadow)", display: "flex", flexDirection: "column", gap: 6 }}>
       <span style={{ width: 38, height: 38, borderRadius: 13, background: on ? "var(--surface)" : "var(--soft-l)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name={icon} /></span>
-      <span style={{ fontSize: 15, fontWeight: 800 }}>{title}</span>
-      <span className="muted" style={{ fontSize: 12, lineHeight: 1.35 }}>{sub}</span>
+      <span style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>{title}</span>
+      <span className="muted" style={{ fontSize: "var(--t-sub)", lineHeight: 1.35 }}>{sub}</span>
     </button>
   );
 }
@@ -61,7 +61,7 @@ function Radio({ title, sub, on, onClick, tag }: { title: string; sub: string; o
       <span style={{ width: 22, height: 22, borderRadius: "50%", border: "2px solid var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{on && <span style={{ width: 10, height: 10, borderRadius: "50%", background: "var(--primary)" }} />}</span>
       <span style={{ flex: 1 }}>
         <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14.5, fontWeight: 800 }}>{title}{tag && <span className="tag" style={{ background: "var(--surface)", fontWeight: 800 }}>{tag}</span>}</span>
-        <span className="muted" style={{ display: "block", fontSize: 12, marginTop: 2 }}>{sub}</span>
+        <span className="muted" style={{ display: "block", fontSize: "var(--t-sub)", marginTop: 2 }}>{sub}</span>
       </span>
     </button>
   );
@@ -209,7 +209,7 @@ function NewChallenge() {
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ flex: 1, display: "flex", gap: 6 }}>{Array.from({ length: total }, (_, i) => <div key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < step ? "var(--primary)" : "var(--soft)" }} />)}</div>
-        <span className="muted" style={{ fontSize: 12.5, fontWeight: 700 }}>{step} of {total}</span>
+        <span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{step} of {total}</span>
       </div>
     </>
   );
@@ -221,7 +221,7 @@ function NewChallenge() {
       {header}
       {q("New challenge")}
       <label style={{ display: "flex", flexDirection: "column", gap: 4, padding: "14px 18px", borderRadius: 20, background: "var(--surface)", boxShadow: "inset 0 0 0 2px var(--primary)" }}>
-        <span className="muted" style={{ fontSize: 12, fontWeight: 800 }}>Name your challenge</span>
+        <span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 800 }}>Name your challenge</span>
         <input autoFocus={!draftId} maxLength={60} placeholder="e.g. Pilates body" value={name} onChange={(e) => setName(e.target.value)} aria-label="Challenge name"
           className="font-display" style={{ border: 0, outline: 0, background: "none", fontSize: 26, fontWeight: 600, padding: 0, width: "100%" }} />
       </label>
@@ -246,7 +246,7 @@ function NewChallenge() {
         </div>
         <button onClick={() => fileRef.current?.click()} className="card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "14px 16px", border: 0, textAlign: "left" }}>
           <span style={{ width: 44, height: 44, borderRadius: 15, background: "var(--soft)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="camera" size={22} /></span>
-          <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: 15, fontWeight: 800 }}>Upload a photo</span><span className="muted" style={{ display: "block", fontSize: 12.5 }}>From your camera or library</span></span>
+          <span style={{ flex: 1 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>Upload a photo</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>From your camera or library</span></span>
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) { setCoverFile(f); setCoverOpen(false); } }} />
         <div className="label">Or pick one</div>
@@ -305,7 +305,7 @@ function NewChallenge() {
           </label>
         </div>
 
-        {start < t && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", lineHeight: 1.45 }}>
+        {start < t && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
           It already started, so the days since {formatShort(start)} count. {linkTo && !unit ? "Days you've ticked on the habit are checked in for you." : "Check in for them from the challenge's week view."}</div>}
         <div className="label">For how long</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -320,8 +320,8 @@ function NewChallenge() {
         <div className="soft" style={{ marginTop: 14, display: "flex", gap: 12, alignItems: "center", padding: "14px 16px", borderRadius: 24 }}>
           <span style={{ width: 40, height: 40, borderRadius: 14, background: "var(--surface)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><Icon name="trophy" /></span>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 800 }}>{name.trim() || "Your challenge"} · {schedule}</div>
-            <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
+            <div style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>{name.trim() || "Your challenge"} · {schedule}</div>
+            <div className="muted" style={{ fontSize: "var(--t-sub)", marginTop: 2 }}>
               {start === t ? "Starts today" : `${start < t ? "Started" : "Starts"} ${parse(start).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}`} · {sessions} sessions over {weeks} weeks
               {freq === "times_per_week" && ". Extra sessions count as bonus."}
             </div>
@@ -347,7 +347,7 @@ function NewChallenge() {
                 </select>
               </label>
             </div>
-            <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", lineHeight: 1.45 }}>
+            <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
               {linkTo ? <>Ticking <b style={{ color: "var(--ink)" }}>{myHabits.find((h) => h.id === linkTo)?.name}</b> on Today checks you in here. It keeps going after the challenge ends.</>
                 : "A new habit shows up on Today while the challenge runs. When it ends, you choose whether to keep it."}
             </div>
@@ -397,14 +397,14 @@ function NewChallenge() {
               <button key={f.id} role="checkbox" aria-checked={on} onClick={() => setInvitees((s) => { const n = new Set(s); if (on) n.delete(f.id); else n.add(f.id); return n; })}
                 className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
                 <Avatar name={f.display_name} path={f.avatar_path} size={38} />
-                <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{f.display_name}</div><div className="muted" style={{ fontSize: 12 }}>{f.shared} challenge{f.shared > 1 ? "s" : ""} together</div></div>
+                <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{f.display_name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{f.shared} challenge{f.shared > 1 ? "s" : ""} together</div></div>
                 <span style={{ width: 28, height: 28, borderRadius: 9, border: on ? 0 : "2px solid var(--primary)", background: on ? "var(--primary)" : "none", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" }}>{on && <Icon name="check" size={16} stroke={2.6} />}</span>
               </button>
             );
           })}
         </div>
       ) : <div className="muted" style={{ fontSize: 13.5, padding: "0 4px" }}>No friends on Frejas yet. You&apos;ll get a link to share in the next step.</div>}
-      {friends.length > 0 && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>They&apos;ll see the invitation in Challenges and can join with one tap.</div>}
+      {friends.length > 0 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>They&apos;ll see the invitation in Challenges and can join with one tap.</div>}
       <div className="label">Who can join with the link</div>
       <div role="radiogroup" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <Radio title="Only people I approve" sub="Anyone else who opens the link asks to join, and you say yes." on={joinMode === "approve"} onClick={() => setJoinMode("approve")} />

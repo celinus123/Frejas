@@ -177,7 +177,7 @@ export function HabitForm({ habit }: { habit?: Habit }) {
           <button aria-label="More" onClick={() => setTimes((x) => Math.min(7, x + 1))} style={{ width: 40, height: 40, borderRadius: "50%", border: 0, background: "var(--soft-l)" }}><Icon name="plus" /></button>
         </div>
       )}
-      <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", lineHeight: 1.4 }}>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.4 }}>
         Shows as <b style={{ color: "var(--ink)" }}>{frequencyLabel({ frequency: freq, days, times_per_week: times })}</b>
         {["times_per_week", "every_other_week", "monthly"].includes(freq) && " · any day you like, under This week on Today"}
       </div>
@@ -196,13 +196,13 @@ export function HabitForm({ habit }: { habit?: Habit }) {
       {!habit && start < t && (fixed ? (
         <div className="card" style={{ borderRadius: 16 }}>
           <div className="row">
-            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>I did it every time since then</div>
-              <div className="muted" style={{ fontSize: 12 }}>{fill ? `Ticks ${backDays.length} ${backDays.length === 1 ? "day" : "days"} for you, ${formatShort(start)} to yesterday` : "You tick the earlier days yourself on Today"}</div></div>
+            <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>I did it every time since then</div>
+              <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{fill ? `Ticks ${backDays.length} ${backDays.length === 1 ? "day" : "days"} for you, ${formatShort(start)} to yesterday` : "You tick the earlier days yourself on Today"}</div></div>
             <Switch on={fill} onChange={setFill} label="Tick the days since the start" />
           </div>
         </div>
-      ) : <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>Counts from {formatShort(start)}. After saving, tap a date on Today to tick the days you did it.</div>)}
-      {habit && start !== habitStart(habit) && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>
+      ) : <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Counts from {formatShort(start)}. After saving, tap a date on Today to tick the days you did it.</div>)}
+      {habit && start !== habitStart(habit) && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>
         {start < habitStart(habit) ? "Days from then on count. Tap a date on Today to tick what you did." : "Days before this date stop counting. Ticks you made are kept."}</div>}
 
       <div className="label">Category <span style={{ fontWeight: 600 }}>· optional</span></div>
@@ -218,33 +218,33 @@ export function HabitForm({ habit }: { habit?: Habit }) {
           <button className="chip" onClick={() => { setAdding(true); setCatErr(null); }} style={{ color: "var(--ink-2)" }}><Icon name="plus" size={15} stroke={2.2} />New</button>
         )}
       </div>
-      {catErr ? <div role="alert" className="muted" style={{ fontSize: 12.5, padding: "0 4px", color: "var(--ink)" }}>{catErr}</div>
-        : used.length >= MAX_CATEGORIES - 3 && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>{used.length} of {MAX_CATEGORIES} categories used.</div>}
+      {catErr ? <div role="alert" className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", color: "var(--ink)" }}>{catErr}</div>
+        : used.length >= MAX_CATEGORIES - 3 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{used.length} of {MAX_CATEGORIES} categories used.</div>}
 
       <div className="label">Who can see it</div>
       <div className="card group">
         <div className="row">
           <Icon name={shared ? "users" : "lock"} color="var(--primary)" />
-          <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{shared ? "Friends" : "Private"}</div>
-            <div className="muted" style={{ fontSize: 12 }}>{shared ? "People in your challenges can see your check-ins" : "Only you"}</div></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{shared ? "Friends" : "Private"}</div>
+            <div className="muted" style={{ fontSize: "var(--t-sub)" }}>{shared ? "People in your challenges can see your check-ins" : "Only you"}</div></div>
           <Switch on={shared} onChange={setShared} label="Visible to friends" />
         </div>
       </div>
-      <div className="muted" style={{ fontSize: 12, padding: "0 4px" }}>Reminders are coming in a later version.</div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Reminders are coming in a later version.</div>
 
       {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
 
       {habit && (
         <div className="card group" style={{ marginTop: 10 }}>
           <button className="row" onClick={archive} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
-            <Icon name="archive" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>{habit.archived_at ? "Restore habit" : "Archive habit"}</div>
-              <div className="muted" style={{ fontSize: 12 }}>Hide it from Today, keep your history</div></div>
+            <Icon name="archive" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{habit.archived_at ? "Restore habit" : "Archive habit"}</div>
+              <div className="muted" style={{ fontSize: "var(--t-sub)" }}>Hide it from Today, keep your history</div></div>
           </button>
           {others.length > 0 && (
             <div>
               <button className="row" onClick={() => setMergeOpen((v) => !v)} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
-                <Icon name="repeat" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Merge with another habit</div>
-                  <div className="muted" style={{ fontSize: 12 }}>For duplicates. Keeps all ticks from both</div></div>
+                <Icon name="repeat" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Merge with another habit</div>
+                  <div className="muted" style={{ fontSize: "var(--t-sub)" }}>For duplicates. Keeps all ticks from both</div></div>
               </button>
               {mergeOpen && (
                 <div style={{ display: "flex", gap: 8, padding: "0 16px 14px" }}>
@@ -261,8 +261,8 @@ export function HabitForm({ habit }: { habit?: Habit }) {
             </div>
           )}
           <button className="row" onClick={remove} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
-            <Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Delete habit</div>
-              <div className="muted" style={{ fontSize: 12 }}>Removes its history. Can't be undone.</div></div>
+            <Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Delete habit</div>
+              <div className="muted" style={{ fontSize: "var(--t-sub)" }}>Removes its history. Can't be undone.</div></div>
           </button>
         </div>
       )}

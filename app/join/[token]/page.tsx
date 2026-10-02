@@ -152,7 +152,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
                   {habits.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
                 </select>
               </label>
-              <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>
+              <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>
                 {habitId === "new" ? "A new habit shows up on Today. When the challenge ends, you choose whether to keep it." : "Ticking this habit on Today checks you in here too."}
               </div>
             </>
@@ -174,8 +174,8 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
                 <span className="muted" style={{ fontSize: 14, fontWeight: 700, whiteSpace: "nowrap" }}>{unitLabel} {v2 ? "per session" : "per day"}</span></label>
             </>
           )}
-          {(askTimes || askAmount) && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>Others see your goal. It locks when the challenge starts.</div>}
-          {approve && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>{inv.member_names[0]} approves new people, so you'll send a request.</div>}
+          {(askTimes || askAmount) && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Others see your goal. It locks when the challenge starts.</div>}
+          {approve && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{inv.member_names[0]} approves new people, so you'll send a request.</div>}
           {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
           <div style={{ flex: 1 }} />
           <button className="btn btn-primary" disabled={busy || (askAmount && !(num > 0))} onClick={join}>

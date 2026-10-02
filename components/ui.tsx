@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Icon } from "./Icon";
 import { signedUrls } from "@/lib/photos";
+import { D } from "@/lib/design";
 
 export function Nav({ onPlus }: { onPlus?: () => void }) {
   const path = usePathname();
@@ -26,7 +27,7 @@ export function Nav({ onPlus }: { onPlus?: () => void }) {
           const on = it.href === "/" ? path === "/" : path.startsWith(it.href);
           return (
             <Link key={i} href={it.href} aria-current={on ? "page" : undefined} style={{ width: 62, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, color: on ? "var(--primary)" : "var(--ink-2)", fontSize: 11, fontWeight: on ? 800 : 600, textDecoration: "none" }}>
-              <Icon name={it.icon} size={22} stroke={on ? 2.1 : 1.8} />
+              <Icon name={it.icon} size={D.icon.nav} stroke={on ? 2.1 : 1.8} />
               <span>{it.label}</span>
             </Link>
           );
@@ -36,7 +37,7 @@ export function Nav({ onPlus }: { onPlus?: () => void }) {
   );
 }
 
-export function Sheet({ open, onClose, children, label }: { open: boolean; onClose: () => void; children: ReactNode; label: string }) {
+export function Sheet({ open, onClose, children, label, bare }: { open: boolean; onClose: () => void; children: ReactNode; label: string; bare?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -47,8 +48,8 @@ export function Sheet({ open, onClose, children, label }: { open: boolean; onClo
   if (!open) return null;
   return (
     <div className="sheet-backdrop" onClick={onClose}>
-      <div className="sheet" role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}>
-        <div className="sheet-handle" />
+      <div className={bare ? "sheet bare" : "sheet"} role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}>
+        {!bare && <div className="sheet-handle" />}
         {children}
       </div>
     </div>

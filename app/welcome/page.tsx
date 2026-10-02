@@ -133,7 +133,7 @@ function Welcome() {
       )}
       <div style={{ flex: 1 }} />
       <button className="btn btn-primary" onClick={() => setStep("email")}><Icon name="mail" />Continue with email</button>
-      <p className="muted" style={{ textAlign: "center", fontSize: 12, lineHeight: 1.5, margin: 0 }}>
+      <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", lineHeight: 1.5, margin: 0 }}>
         By continuing you agree to the <a href="/terms" style={{ color: "var(--ink)" }}>Terms</a> and <a href="/privacy" style={{ color: "var(--ink)" }}>Privacy Policy</a>.
       </p>
     </>,
@@ -156,7 +156,7 @@ function Welcome() {
         {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
         <button className="btn btn-primary" disabled={busy || !/.+@.+\..+/.test(email) || (isReview && !password)}>{busy ? (isReview ? "Signing in…" : "Sending…") : isReview ? "Sign in" : "Send code"}</button>
       </form>
-      <p className="muted" style={{ textAlign: "center", fontSize: 12.5, margin: 0 }}>New here? The same code creates your account.</p>
+      <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", margin: 0 }}>New here? The same code creates your account.</p>
     </>,
   );
 

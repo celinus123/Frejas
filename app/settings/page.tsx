@@ -74,30 +74,30 @@ export default function Settings() {
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <label className="field" style={{ minHeight: 46 }}><input maxLength={40} value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} aria-label="Name" /></label>
-          <div className="muted" style={{ fontSize: 12.5, padding: "6px 4px 0", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+          <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "6px 4px 0", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
         </div>
       </div>
 
       <div className="label">Appearance</div>
-      <div className="card group"><div className="row"><Icon name="moon" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Theme</div><div className="muted" style={{ fontSize: 12 }}>Auto follows your phone</div></div>{seg}</div></div>
+      <div className="card group"><div className="row"><Icon name="moon" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Theme</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Auto follows your phone</div></div>{seg}</div></div>
 
       <div className="label">Privacy</div>
       <div className="card group">
-        <div className="row"><Icon name="lock" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>New habits are private</div>
+        <div className="row"><Icon name="lock" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>New habits are private</div>
           <Switch on={profile.new_habits_private} onChange={(v) => update({ new_habits_private: v })} label="New habits are private" /></div>
         <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={exportData}>
-          <Icon name="download" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Download my data</div></button>
+          <Icon name="download" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Download my data</div></button>
       </div>
 
       <div className="label">About</div>
       <div className="card group">
-        <Link href="/privacy" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="shield" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Privacy policy</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
-        <Link href="/terms" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="edit" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Terms</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+        <Link href="/privacy" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="shield" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Privacy policy</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+        <Link href="/terms" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="edit" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Terms</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
       </div>
 
       <div className="card group" style={{ marginTop: 8 }}>
-        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={logout}><Icon name="logout" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Log out</div></button>
-        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setConfirmDelete((v) => !v)}><Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Delete account</div><div className="muted" style={{ fontSize: 12 }}>Permanently removes your data</div></div></button>
+        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={logout}><Icon name="logout" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Log out</div></button>
+        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setConfirmDelete((v) => !v)}><Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Delete account</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Permanently removes your data</div></div></button>
       </div>
 
       {confirmDelete && (
@@ -110,7 +110,7 @@ export default function Settings() {
           <button className="btn" style={{ background: "var(--ink)", color: "var(--bg)" }} disabled={busy || typed.trim().toLowerCase() !== email.toLowerCase()} onClick={deleteAccount}>{busy ? "Deleting…" : "Delete my account"}</button>
         </section>
       )}
-      <div className="muted" style={{ textAlign: "center", fontSize: 12, marginTop: 10 }}>Frejas · version 0.1</div>
+      <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1</div>
     </main>
   );
 }
