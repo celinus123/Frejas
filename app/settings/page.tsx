@@ -8,8 +8,12 @@ import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { uploadAvatar } from "@/lib/photos";
 import { myBlocks, unblockUser, type Blocked } from "@/lib/safety";
-import { NOTE_KINDS, enablePush, forgetPush, pushDetails, pushState, testPush, type PushState } from "@/lib/push";
-import type { Profile } from "@/lib/types";
+import { NOTE_KINDS, enablePush, forgetPush, hhmm, pushDetails, pushState, syncReminders, testPush, type PushState } from "@/lib/push";
+import type { Habit, Profile } from "@/lib/types";
+
+// a habit that has (or, until you leave the page, had) a reminder
+interface Reminder { id: string; name: string; when: string; time: string; on: boolean }
+const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function Settings() {
   const router = useRouter();
@@ -23,6 +27,26 @@ export default function Settings() {
   const [blocksOpen, setBlocksOpen] = useState(false);
   useEffect(() => { if (userId) myBlocks().then(setBlocks); }, [userId]);
   const [push, setPush] = useState<PushState | null>(null);
+  const [reminders, setReminders] = useState<Reminder[] | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    supabase().from("habits").select("id, name, frequency, days, reminder_time").eq("owner_id", userId).is("archived_at", null).not("reminder_time", "is", null).order("reminder_time").then(({ data }) =>
+      setReminders(((data ?? []) as Pick<Habit, "id" | "name" | "frequency" | "days" | "reminder_time">[]).map((h) => ({
+        id: h.id, name: h.name, time: hhmm(h.reminder_time), on: true,
+        when: h.frequency === "specific_days" && h.days?.length ? [...h.days].sort().map((d) => DAY[d - 1]).join(", ") : "Every day",
+      }))));
+  }, [userId]);
+  // switching one off removes the time from the habit; it stays in the list until you leave, so it can be switched back on
+  async function setReminder(ids: string[], on: boolean) {
+    const now = reminders ?? [];
+    for (const r of now.filter((x) => ids.includes(x.id))) {
+      const { error } = await supabase().from("habits").update({ reminder_time: on ? r.time : null }).eq("id", r.id);
+      if (error) { toast({ text: error.message }); return; }
+    }
+    setReminders(now.map((r) => (ids.includes(r.id) ? { ...r, on } : r)));
+    const { data } = await supabase().from("habits").select("id, name, frequency, days, reminder_time, archived_at").eq("owner_id", userId!);
+    syncReminders((data ?? []) as Parameters<typeof syncReminders>[0]);
+  }
   const [phone, setPhone] = useState<{ registered: boolean; problem: string | null } | null>(null);
   const checkPhone = () => setTimeout(() => pushDetails().then(setPhone), 2500);   // registering takes the phone a moment
   useEffect(() => { pushState().then((s) => { setPush(s); if (s === "granted") pushDetails().then(setPhone); }); }, []);
@@ -126,7 +150,22 @@ export default function Settings() {
           return <div key={id} className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>{label}</div><Switch on={!off.includes(id)} onChange={(v) => update({ notify_off: v ? off.filter((x) => x !== id) : [...off, id] })} label={label} /></div>;
         })}
       </div>
-      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>{push === "unavailable" ? "Notifications arrive in the iPhone app. " : ""}Reminders are set on each habit and challenge.</div>
+      {push === "unavailable" && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>Notifications arrive in the iPhone app.</div>}
+
+      <div className="label">Reminders</div>
+      {reminders && reminders.length > 0 && (
+        <div className="card group">
+          {reminders.map((r) => (
+            <div key={r.id} className="row" style={{ opacity: r.on ? 1 : 0.6 }}>
+              <Icon name="clock" color="var(--primary)" />
+              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{r.when} at {r.time}</div></div>
+              <Switch on={r.on} onChange={(v) => setReminder([r.id], v)} label={`Reminder for ${r.name}`} />
+            </div>
+          ))}
+        </div>
+      )}
+      {reminders && reminders.filter((r) => r.on).length > 1 && <button className="btn" style={{ background: "none", color: "var(--ink-2)", height: 36 }} onClick={() => setReminder(reminders.filter((r) => r.on).map((r) => r.id), false)}>Turn all reminders off</button>}
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>{reminders?.length ? "To change the time, open the habit, or the menu of the challenge." : "No reminders yet. Set one when you edit a habit, or in the menu of a challenge."}</div>
 
       <div className="label">Privacy</div>
       <div className="card group">

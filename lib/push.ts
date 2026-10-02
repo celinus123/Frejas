@@ -21,14 +21,16 @@ export type NoteKind = (typeof NOTE_KINDS)[number][0];
 
 const TOKEN_KEY = "frejas-push-token";
 const PROBLEM_KEY = "frejas-push-problem";
-const push = async () => (await import("@capacitor/push-notifications")).PushNotifications;
-const local = async () => (await import("@capacitor/local-notifications")).LocalNotifications;
+// The plugins are always taken out of their module right where they are used, never handed back from an async
+// function: a Capacitor plugin answers to every name, "then" included, so `await` on the plugin itself never finishes.
+const pushMod = () => import("@capacitor/push-notifications");
+const localMod = () => import("@capacitor/local-notifications");
 const asState = (s: string): PushState => (s === "granted" ? "granted" : s === "denied" ? "denied" : "prompt");
 
 export async function pushState(): Promise<PushState> {
   if (!isNative()) return "unavailable";
   if (!hasPlugin("PushNotifications")) return "old-app";
-  try { return asState((await (await push()).checkPermissions()).receive); } catch { return "unavailable"; }
+  try { const { PushNotifications: P } = await pushMod(); return asState((await P.checkPermissions()).receive); } catch { return "unavailable"; }
 }
 
 let listening = false;
@@ -37,7 +39,7 @@ export async function startPush(open: (url: string) => void) {
   if (!isNative() || listening) return;
   listening = true;
   try {
-    const P = await push();
+    const { PushNotifications: P } = await pushMod();
     await P.addListener("registration", (t) => {
       try { localStorage.setItem(TOKEN_KEY, t.value); localStorage.removeItem(PROBLEM_KEY); } catch {}
       supabase().rpc("save_push_token", { p_token: t.value, p_platform: "ios" }).then(({ error }) => { if (error) try { localStorage.setItem(PROBLEM_KEY, `Couldn't save this phone: ${error.message}`); } catch {} }, () => {});
@@ -45,7 +47,7 @@ export async function startPush(open: (url: string) => void) {
     // the phone could not get an address from Apple (for example when the app was built without the right to send notifications)
     await P.addListener("registrationError", (e) => { try { localStorage.setItem(PROBLEM_KEY, e.error || "The phone couldn't register with Apple."); } catch {} });
     await P.addListener("pushNotificationActionPerformed", (a) => { const url = (a.notification.data as { url?: string } | undefined)?.url; if (url && url.startsWith("/")) open(url); });
-    const L = await local();
+    const { LocalNotifications: L } = await localMod();
     await L.addListener("localNotificationActionPerformed", (a) => { const url = (a.notification.extra as { url?: string } | undefined)?.url; if (url && url.startsWith("/")) open(url); });
     if ((await P.checkPermissions()).receive === "granted") await P.register();
   } catch { listening = false; }
@@ -55,7 +57,7 @@ export async function startPush(open: (url: string) => void) {
 export async function enablePush(): Promise<PushState> {
   if (!isNative()) return "unavailable";
   try {
-    const P = await push();
+    const { PushNotifications: P } = await pushMod();
     let s = (await P.checkPermissions()).receive;
     if (s === "prompt" || s === "prompt-with-rationale") s = (await P.requestPermissions()).receive;
     if (s === "granted") await P.register();
@@ -90,7 +92,7 @@ export async function forgetPush() {
     const t = localStorage.getItem(TOKEN_KEY);
     if (t) await supabase().from("push_tokens").delete().eq("token", t);
     localStorage.removeItem(TOKEN_KEY);
-    const L = await local();
+    const { LocalNotifications: L } = await localMod();
     const pending = await L.getPending();
     if (pending.notifications.length) await L.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
   } catch { /* nothing to undo */ }
@@ -129,7 +131,7 @@ export function remindersFor(habits: Pick<Habit, "id" | "name" | "frequency" | "
 export async function syncReminders(habits: Parameters<typeof remindersFor>[0]) {
   if (!isNative()) return;
   try {
-    const L = await local();
+    const { LocalNotifications: L } = await localMod();
     const want = remindersFor(habits);
     const pending = await L.getPending();
     if (pending.notifications.length) await L.cancel({ notifications: pending.notifications.map((n) => ({ id: n.id })) });
