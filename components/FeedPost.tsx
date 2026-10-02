@@ -6,7 +6,7 @@ import { Flame, Icon } from "./Icon";
 import { Ring } from "./Ring";
 import { Avatar, Sheet } from "./ui";
 import { D, EMOJIS, type Emoji } from "@/lib/design";
-import { MAX_COMMENT, summary, type Person, type PostRef, type Social } from "@/lib/social";
+import { MAX_COMMENT, reactMode, summary, type Person, type PostRef, type Social } from "@/lib/social";
 import type { FunCard } from "@/lib/feedCards";
 import { fmt } from "@/lib/scoring";
 import { addDays, parse, timeAgo, today } from "@/lib/dates";
@@ -47,6 +47,7 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
   const mine = social.reactions.find((r) => r.user_id === uid)?.emoji ?? null;
   const author = who(post.authorId);
   const ci = post.ci, c = post.challenge;
+  const mode = reactMode(post.ref);   // true: pick an emoji · "heart": plain like · false: nothing yet
 
   const whoRow = (on: boolean, tick = false) => (
     <div className={on ? "who on" : "who"}>
@@ -61,9 +62,10 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
       <span>{D.bubble.showName && <b>{who(s.latest.user_id).name} </b>}{s.latest.body}</span>
     </button>
   );
-  const acts = (
+  const acts = mode !== false && (
     <div className="acts">
-      <button className={mine ? "rbtn mine" : "rbtn"} aria-expanded={pickerOpen} aria-label={mine ? `Your reaction: ${mine}. Change it` : "React"} onClick={() => setPicker(!pickerOpen)}>
+      <button className={mine ? "rbtn mine" : "rbtn"} aria-expanded={mode === true ? pickerOpen : undefined} aria-pressed={mode === "heart" ? !!mine : undefined}
+        aria-label={mine ? (mode === true ? `Your reaction: ${mine}. Change it` : "Remove your heart") : "React"} onClick={() => (mode === true ? setPicker(!pickerOpen) : onReact(mine ? null : "❤️"))}>
         {mine ? <i className="em">{mine}</i> : <Icon name="heart" size={D.icon.action} />}
       </button>
       {s.total > 0 && <span className="sum" aria-label={`${s.total} reactions`}>{s.emojis.slice(0, 3).map((x) => <i key={x.e} className="em">{x.e}</i>)}<span>{s.total}</span></span>}
@@ -72,7 +74,7 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
       </button>
     </div>
   );
-  const picker = pickerOpen && <Picker mine={mine} onPick={onReact} />;
+  const picker = pickerOpen && mode === true && <Picker mine={mine} onPick={onReact} />;
 
   if (post.habits) return (
     <article className="post card">
@@ -198,6 +200,7 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
   const author = who(post.authorId);
   const ci = post.ci, c = post.challenge;
   const n = social.comments.length;
+  const mode = reactMode(post.ref);
   useEffect(() => { if (n) endRef.current?.scrollIntoView({ block: "nearest" }); }, [n]);
 
   async function send() {
@@ -239,8 +242,9 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
         )}
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
           {s.emojis.map((x) => <button key={x.e} className="rx-chip" aria-pressed={mine === x.e} aria-label={mine === x.e ? `Remove your ${x.e}` : `React with ${x.e}`} onClick={() => onReact(mine === x.e ? null : (x.e as Emoji))}><i className="em">{x.e}</i>{x.n}</button>)}
-          {pick ? <Picker inline mine={mine} onPick={(e) => { onReact(e); setPick(false); }} />
-            : <button aria-label="Add a reaction" onClick={() => setPick(true)} className="rx-chip" style={{ width: 30, padding: 0, justifyContent: "center", color: "var(--ink-2)" }}>{s.total ? <Icon name="plus" size={D.icon.inline} stroke={2.2} /> : <Icon name="heart" size={D.icon.action} />}</button>}
+          {mode === "heart" && !mine && <button aria-label="React" onClick={() => onReact("❤️")} className="rx-chip" style={{ width: 30, padding: 0, justifyContent: "center", color: "var(--ink-2)" }}><Icon name="heart" size={D.icon.action} /></button>}
+          {mode === true && (pick ? <Picker inline mine={mine} onPick={(e) => { onReact(e); setPick(false); }} />
+            : <button aria-label="Add a reaction" onClick={() => setPick(true)} className="rx-chip" style={{ width: 30, padding: 0, justifyContent: "center", color: "var(--ink-2)" }}>{s.total ? <Icon name="plus" size={D.icon.inline} stroke={2.2} /> : <Icon name="heart" size={D.icon.action} />}</button>)}
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 28 }}>
           <b className="t-title">{n ? `Comments · ${n}` : "No comments yet"}</b>

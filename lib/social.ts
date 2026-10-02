@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from "./supabase";
 import type { Emoji } from "./design";
+import { emojiSupported } from "./data";
 
 /** A post in the feed is either a check-in, or someone's shared habits for one day. */
 export type PostRef = { kind: "checkin"; id: string } | { kind: "day"; owner: string; day: string };
@@ -16,14 +17,19 @@ export const noSocial: Social = { reactions: [], comments: [] };
 const sb = () => supabase();
 const byTime = (a: PostComment, b: PostComment) => a.created_at.localeCompare(b.created_at);
 
+// Day cards get reactions and comments with database change 009; before that they are simply shown without them.
+let dayReady: boolean | null = null;
+export const daySocialSupported = () => dayReady !== false;
+
 /** Reactions and comments on day cards you can see, from `since` on. */
 export async function loadDaySocial(since: string): Promise<Record<string, Social>> {
+  if (dayReady === false) return {};
   const [r, c] = await Promise.all([
     sb().from("day_reactions").select("owner_id, day, user_id, emoji").gte("day", since),
     sb().from("day_comments").select("id, owner_id, day, user_id, body, created_at").gte("day", since).order("created_at"),
   ]);
-  if (r.error) throw r.error;
-  if (c.error) throw c.error;
+  if (r.error || c.error) { dayReady = false; return {}; }
+  dayReady = true;
   const out: Record<string, Social> = {};
   const at = (owner: string, day: string) => (out[`d:${owner}:${day}`] ??= { reactions: [], comments: [] });
   for (const x of (r.data ?? []) as { owner_id: string; day: string; user_id: string; emoji: string }[]) at(x.owner_id, x.day).reactions.push({ user_id: x.user_id, emoji: x.emoji });
@@ -31,13 +37,17 @@ export async function loadDaySocial(since: string): Promise<Record<string, Socia
   return out;
 }
 
+/** Can this post be reacted to with a choice of emoji (true), with a plain heart ("heart"), or not at all yet (false)? */
+export const reactMode = (ref: PostRef): true | "heart" | false =>
+  ref.kind === "day" ? daySocialSupported() : emojiSupported() ? true : "heart";
+
 /** Set, change or remove (emoji = null) your reaction. `had` = you already had one on this post. */
 export async function react(ref: PostRef, uid: string, emoji: Emoji | null, had: boolean) {
   const table = ref.kind === "checkin" ? "reactions" : "day_reactions";
-  const key = ref.kind === "checkin" ? { check_in_id: ref.id, user_id: uid } : { owner_id: ref.owner, day: ref.day, user_id: uid };
+  const key: Record<string, string> = ref.kind === "checkin" ? { check_in_id: ref.id, user_id: uid } : { owner_id: ref.owner, day: ref.day, user_id: uid };
   const q = emoji === null ? sb().from(table).delete().match(key)
     : had ? sb().from(table).update({ emoji }).match(key)
-      : sb().from(table).insert({ ...key, emoji });
+      : sb().from(table).insert(ref.kind === "checkin" && !emojiSupported() ? key : { ...key, emoji });
   const { error } = await q;
   if (error) throw error;
 }

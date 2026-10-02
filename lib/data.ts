@@ -7,7 +7,21 @@ import { nativeShare } from "./native";
 const sb = () => supabase();
 
 // check_ins reaches profiles two ways (the author, and everyone who reacted), so the author link has to be named.
-const CHECKIN_SELECT = "*, profiles!check_ins_user_id_fkey(display_name, avatar_path), reactions(user_id, emoji), comments(id, user_id, body, created_at)";
+const CHECKIN_BASE = "*, profiles!check_ins_user_id_fkey(display_name, avatar_path), comments(id, user_id, body, created_at)";
+
+// Reactions with a choice of emoji arrive with database change 009. Until it is in place the app
+// works with plain hearts, so the app and the database don't have to be updated at the same moment.
+let emojiReady: boolean | null = null;
+export const emojiSupported = () => emojiReady !== false;
+type Rows = { data: unknown[] | null; error: { message: string } | null };
+async function selectCheckIns(apply: (select: string) => PromiseLike<Rows>): Promise<Rows> {
+  if (emojiReady !== false) {
+    const r = await apply(`${CHECKIN_BASE}, reactions(user_id, emoji)`);
+    if (!r.error) { emojiReady = true; return r; }
+    emojiReady = false;
+  }
+  return apply(`${CHECKIN_BASE}, reactions(user_id)`);
+}
 
 export async function loadHabits(uid: string, includeArchived = false): Promise<Habit[]> {
   let q = sb().from("habits").select("*").eq("owner_id", uid).order("created_at");
@@ -121,7 +135,7 @@ export async function loadChallenge(id: string) {
   const [c, m, ci] = await Promise.all([
     sb().from("challenges").select("*").eq("id", id).maybeSingle(),
     sb().from("challenge_members").select("*, profiles(display_name, avatar_path)").eq("challenge_id", id).order("joined_at"),
-    sb().from("check_ins").select(CHECKIN_SELECT).eq("challenge_id", id).order("created_at", { ascending: false }),
+    selectCheckIns((sel) => sb().from("check_ins").select(sel).eq("challenge_id", id).order("created_at", { ascending: false })),
   ]);
   if (c.error) throw c.error;
   if (m.error) throw m.error;
@@ -162,10 +176,9 @@ export async function alignHabitStart(habitId: string, start: string) {
 }
 
 export async function loadFeed(limit = 60): Promise<CheckIn[]> {
-  const { data, error } = await sb().from("check_ins").select(CHECKIN_SELECT)
-    .order("created_at", { ascending: false }).limit(limit);
+  const { data, error } = await selectCheckIns((sel) => sb().from("check_ins").select(sel).order("created_at", { ascending: false }).limit(limit));
   if (error) throw error;
-  return data as CheckIn[];
+  return (data ?? []) as CheckIn[];
 }
 
 export async function toggleLike(checkInId: string, uid: string, liked: boolean) {
