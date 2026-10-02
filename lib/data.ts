@@ -207,6 +207,21 @@ export async function toggleLike(checkInId: string, uid: string, liked: boolean)
   else await sb().from("reactions").insert({ check_in_id: checkInId, user_id: uid });
 }
 
+/** What an invite link shows before you join. */
+export interface InvitePreview {
+  challenge_id: string; name: string; goal_type: "own" | "shared"; unit: string | null; starts_on: string; ends_on: string;
+  stake: string | null; member_names: string[]; member_count?: number;
+  frequency: Challenge["frequency"]; days: number[] | null; times_per_week: number | null; min_amount: number | null;
+  same_goal: boolean; win_rule: Challenge["win_rule"]; join_mode: Challenge["join_mode"]; cover_preset: Challenge["cover_preset"];
+  join_by?: string | null;
+}
+export async function invitePreview(token: string): Promise<InvitePreview | null> {
+  const r = await sb().rpc("invite_preview", { p_token: token });
+  if (!r.error) return (r.data as InvitePreview | null) ?? null;
+  const { data } = await sb().rpc("get_invite", { p_token: token });   // before database change 011
+  return (data as InvitePreview[] | null)?.[0] ?? null;
+}
+
 export function inviteUrl(token: string) {
   return `${window.location.origin}/join/${token}`;
 }

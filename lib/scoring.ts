@@ -1,5 +1,5 @@
 import type { Challenge, CheckIn, Member } from "./types";
-import { addDays, diffDays, startOfWeek, today, weekday } from "./dates";
+import { addDays, diffDays, formatShort, startOfWeek, today, weekday } from "./dates";
 
 /** Unified row for leaderboards, cards and results — works for old and new challenges. */
 export interface Standing {
@@ -33,6 +33,22 @@ export function daysSoFar(c: Challenge): number {
 export const daysLeft = (c: Challenge) => (today() > c.ends_on ? 0 : diffDays(c.ends_on, today() < c.starts_on ? c.starts_on : today()) + 1);
 export const totalDays = (c: Challenge) => diffDays(c.ends_on, c.starts_on) + 1;
 export const weeksLeft = (c: Challenge) => Math.ceil(daysLeft(c) / 7);
+
+// ---------------------------------------------------------------- last day to join
+type HasJoinBy = { join_by?: string | null };
+export const joinClosed = (c: HasJoinBy) => !!c.join_by && c.join_by < today();
+/** For a label on an invitation: "Join by 5 Oct", "Last day to join", "Joining closed 5 Oct". */
+export function joinByLabel(c: HasJoinBy): string | null {
+  if (!c.join_by) return null;
+  const n = diffDays(c.join_by, today());
+  return n < 0 ? `Joining closed ${formatShort(c.join_by)}` : n === 0 ? "Last day to join" : `Join by ${formatShort(c.join_by)}`;
+}
+/** For a list: "3 days left to join". */
+export function joinLeft(c: HasJoinBy): string | null {
+  if (!c.join_by) return null;
+  const n = diffDays(c.join_by, today());
+  return n < 0 ? "Joining closed" : n === 0 ? "Last day to join" : `${n} ${n === 1 ? "day" : "days"} left to join`;
+}
 
 export function fmt(n: number): string {
   return Number.isInteger(n) ? n.toLocaleString("en-GB") : n.toLocaleString("en-GB", { maximumFractionDigits: 1 });

@@ -9,15 +9,14 @@ import { Ring } from "@/components/Ring";
 import { Avatar, Avatars, Empty } from "@/components/ui";
 import { PageHead } from "@/components/PageHead";
 import { supabase } from "@/lib/supabase";
-import { loadChallenge, myChallenges, myDrafts, myInvitations, type Invitation, type MyChallenge } from "@/lib/data";
-import { daysLeft, fmt, isV2, ordinal, scheduleLabel, sharedTotal, standings, type Standing } from "@/lib/scoring";
+import { invitePreview, loadChallenge, myChallenges, myDrafts, myInvitations, type Invitation, type InvitePreview, type MyChallenge } from "@/lib/data";
+import { daysLeft, fmt, isV2, joinClosed, joinLeft, ordinal, scheduleLabel, sharedTotal, standings, type Standing } from "@/lib/scoring";
 import { diffDays, formatShort, today } from "@/lib/dates";
 import { forgetInvite, savedInvites } from "@/lib/savedInvites";
-import type { Challenge, CoverPreset } from "@/lib/types";
+import type { Challenge } from "@/lib/types";
 
 /** An invitation link you answered "Not now" to (remembered on this device). */
-interface SavedLink { token: string; challenge_id: string; name: string; starts_on: string; ends_on: string; cover_preset: CoverPreset | null; member_names: string[];
-  frequency: Challenge["frequency"]; days: number[] | null; times_per_week: number | null; min_amount: number | null; unit: string | null }
+type SavedLink = InvitePreview & { token: string };
 
 interface Row extends MyChallenge {
   mine: Standing | null;
@@ -47,8 +46,7 @@ export default function Challenges() {
       setInvites(inv);
       // links put aside with "Not now": still valid, and not something you joined or were invited to in the meantime
       const found = await Promise.all(savedInvites().map(async (token) => {
-        const { data } = await supabase().rpc("get_invite", { p_token: token });
-        const row = (data as Omit<SavedLink, "token">[] | null)?.[0];
+        const row = await invitePreview(token);
         if (!row || mc.some((x) => x.challenge.id === row.challenge_id)) { forgetInvite(token); return null; }
         return inv.some((x) => x.challenge.id === row.challenge_id) ? null : { ...row, token };
       }));
@@ -93,6 +91,13 @@ export default function Challenges() {
   const upcoming = rows.filter((r) => r.challenge.starts_on > t).sort((a, b) => a.challenge.starts_on.localeCompare(b.challenge.starts_on));
   const finished = rows.filter((r) => r.challenge.ends_on < t).sort((a, b) => b.challenge.ends_on.localeCompare(a.challenge.ends_on));
   const nothing = !rows.length && !drafts.length && !invites.length && !links.length;
+
+  // how long an invitation can still be accepted
+  const joinTag = (c: { join_by?: string | null }) => joinLeft(c) && (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, padding: "2px 9px", borderRadius: 999, background: joinClosed(c) ? "var(--soft)" : "var(--accent-bg)", fontSize: "var(--t-tag)", fontWeight: 800 }}>
+      <Icon name="clock" size={12} />{joinLeft(c)}
+    </div>
+  );
 
   const activeCard = (r: Row, i: number) => {
     const c = r.challenge;
@@ -153,13 +158,14 @@ export default function Challenges() {
                     <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>
                       {isV2(c) ? scheduleLabel(c) : c.goal_type === "own" ? "Own goals" : "Shared goal"} · {formatShort(c.starts_on)} – {formatShort(c.ends_on)}
                     </div>
+                    {joinTag(c)}
                   </div>
                 </Link>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-soft btn-sm" style={{ flex: 1 }} onClick={() => decline(inv)}>Not now</button>
-                  <button className="btn btn-primary btn-sm" style={{ flex: 1 }} disabled={busy === c.id} onClick={() => accept(inv)}>
+                  <button className="btn btn-soft btn-sm" style={{ flex: 1 }} onClick={() => decline(inv)}>{joinClosed(c) ? "Remove" : "Not now"}</button>
+                  {!joinClosed(c) && <button className="btn btn-primary btn-sm" style={{ flex: 1 }} disabled={busy === c.id} onClick={() => accept(inv)}>
                     <Icon name="check" size={17} stroke={2.4} />{busy === c.id ? "Joining…" : "Join"}
-                  </button>
+                  </button>}
                 </div>
               </div>
             );
@@ -172,11 +178,12 @@ export default function Challenges() {
                   <div style={{ fontSize: 12.5 }}><b>{l.member_names[0] ?? "A friend"}</b> sent you a link</div>
                   <div className="font-display" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{l.name}</div>
                   <div className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{l.frequency ? scheduleLabel(l) : "Challenge"} · {formatShort(l.starts_on)} – {formatShort(l.ends_on)}</div>
+                  {joinTag(l)}
                 </div>
               </Link>
               <div style={{ display: "flex", gap: 8 }}>
                 <button className="btn btn-soft btn-sm" style={{ flex: 1 }} onClick={() => { forgetInvite(l.token); setLinks((xs) => xs.filter((x) => x.token !== l.token)); }}>Remove</button>
-                <Link href={`/join/${l.token}`} className="btn btn-primary btn-sm" style={{ flex: 1 }}><Icon name="check" size={17} stroke={2.4} />Join</Link>
+                {!joinClosed(l) && <Link href={`/join/${l.token}`} className="btn btn-primary btn-sm" style={{ flex: 1 }}><Icon name="check" size={17} stroke={2.4} />Join</Link>}
               </div>
             </div>
           ))}

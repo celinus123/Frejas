@@ -11,17 +11,12 @@ import { MembersIn } from "@/components/MembersIn";
 import { forgetInvite, saveInvite } from "@/lib/savedInvites";
 import { supabase } from "@/lib/supabase";
 import { formatShort, today } from "@/lib/dates";
-import { loadHabits } from "@/lib/data";
+import { invitePreview, loadHabits, type InvitePreview } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
-import { fmt, scheduleLabel, winRuleLabel } from "@/lib/scoring";
-import type { Challenge, CoverPreset, Habit } from "@/lib/types";
+import { fmt, joinByLabel, joinClosed, scheduleLabel, winRuleLabel } from "@/lib/scoring";
+import type { Habit } from "@/lib/types";
 
-interface Invite {
-  challenge_id: string; name: string; goal_type: "own" | "shared"; unit: string | null; starts_on: string; ends_on: string;
-  stake: string | null; member_names: string[];
-  frequency: Challenge["frequency"]; days: number[] | null; times_per_week: number | null; min_amount: number | null;
-  same_goal: boolean; win_rule: Challenge["win_rule"]; join_mode: Challenge["join_mode"]; cover_preset: CoverPreset | null;
-}
+type Invite = InvitePreview;
 
 export default function Join({ params }: { params: Promise<{ token: string }> }) {
   const { token } = use(params);
@@ -37,8 +32,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
   const [requested, setRequested] = useState(false);
 
   useEffect(() => {
-    supabase().rpc("get_invite", { p_token: token }).then(({ data }) => {
-      const i = (data as Invite[] | null)?.[0] ?? null;
+    invitePreview(token).then((i) => {
       setInv(i);
       if (i?.times_per_week) setTimes(i.times_per_week);
       if (i?.min_amount) setGoal(String(i.min_amount));
@@ -107,6 +101,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
 
   const chip = (text: React.ReactNode) => <span style={{ display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700, background: "var(--soft)" }}>{text}</span>;
   const first = inv.member_names[0] ?? "A friend";
+  const closed = joinClosed(inv);
 
   return (
     <main className="page" style={{ minHeight: "100dvh", paddingBottom: 30, gap: 14 }}>
@@ -120,12 +115,25 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
           {chip(v2 ? (own ? "Everyone sets their own goal" : scheduleLabel(inv)) : inv.goal_type === "own" ? "Own goals" : "Shared goal")}
           {chip(`${formatShort(inv.starts_on)} – ${formatShort(inv.ends_on)}`)}
           {v2 && chip(winRuleLabel(inv.win_rule))}
+          {joinByLabel(inv) && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 800, background: "var(--accent-bg)" }}><Icon name="clock" size={13} />{joinByLabel(inv)}</span>}
         </div>
         {inv.stake && <StakeLine stake={inv.stake} />}
-        <MembersIn names={inv.member_names} />
+        <MembersIn names={inv.member_names} count={inv.member_count} />
       </section>
 
-      {requested ? (
+      {closed && !requested ? (
+        <>
+          <div className="soft" style={{ padding: 18, borderRadius: 22, display: "flex", gap: 12, alignItems: "flex-start" }}>
+            <Icon name="clock" size={22} />
+            <div>
+              <div style={{ fontWeight: 800 }}>Joining has closed</div>
+              <div style={{ fontSize: 13.5, marginTop: 2 }}>The last day to join was {formatShort(inv.join_by!)}. {first} can open it again from the challenge&apos;s menu.</div>
+            </div>
+          </div>
+          <div style={{ flex: 1 }} />
+          <Link href={session ? "/challenges" : "/"} className="btn btn-soft">{session ? "Go to my challenges" : "Go to Frejas"}</Link>
+        </>
+      ) : requested ? (
         <>
           <div className="soft" style={{ padding: 18, borderRadius: 22, display: "flex", gap: 12, alignItems: "flex-start" }}>
             <Icon name="clock" size={22} />

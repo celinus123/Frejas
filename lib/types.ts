@@ -62,6 +62,7 @@ export interface Challenge {
   join_mode: "open" | "approve";
   cover_preset: CoverPreset | null;
   cover_path: string | null;
+  join_by?: string | null;   // last day to join; null = for as long as it runs (database change 011)
 }
 
 export type CoverPreset = "arches" | "waves" | "sun" | "dots" | "leaf" | "stripes";

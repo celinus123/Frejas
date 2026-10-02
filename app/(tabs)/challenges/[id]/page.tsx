@@ -10,7 +10,7 @@ import { CheckInSheet } from "@/components/CheckInSheet";
 import { supabase } from "@/lib/supabase";
 import { addDays, diffDays, formatShort, parse, timeAgo, today, weekday } from "@/lib/dates";
 import { alignHabitStart, backfillCheckins, ensureHabit, inviteUrl, loadChallenge, myFriends, shareLink } from "@/lib/data";
-import { daysLeft, fmt, isV2, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing, type WeekResult } from "@/lib/scoring";
+import { daysLeft, fmt, isV2, joinByLabel, joinClosed, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing, type WeekResult } from "@/lib/scoring";
 import { PostSheet, type Who } from "@/components/FeedPost";
 import { StakeLine } from "@/components/Stake";
 import { MembersIn } from "@/components/MembersIn";
@@ -60,7 +60,9 @@ function ChallengePage({ id }: { id: string }) {
   const [invited, setInvited] = useState(false);
   const [startOpen, setStartOpen] = useState(false);
   const [newStart, setNewStart] = useState("");
-  const [openCi, setOpenCi] = useState<string | null>(null);   // the check-in that is opened (photo, reactions, comments)
+  const [openCi, setOpenCi] = useState<string | null>(null);
+  const [joinOpen, setJoinOpen] = useState(false);      // the "last day to join" sheet
+  const [newJoinBy, setNewJoinBy] = useState<string | null>(null);   // the check-in that is opened (photo, reactions, comments)
   const t = today();
 
   const load = useCallback(async () => {
@@ -172,6 +174,13 @@ function ChallengePage({ id }: { id: string }) {
     }
     setStartOpen(false); setMenu(false);
     toast({ text: <><b>{d > t ? "Starts" : "Started"} {formatShort(d)}.</b>{added ? ` ${added} ${added === 1 ? "day" : "days"} you'd already ticked ${added === 1 ? "is" : "are"} checked in.` : d < t ? " Tap a day in the week view to check in for it." : ""}</> });
+    load();
+  }
+  async function saveJoinBy() {
+    const { error } = await supabase().from("challenges").update({ join_by: newJoinBy }).eq("id", c!.id);
+    if (error) { toast({ text: /join_by/.test(error.message) ? "This isn't switched on yet. Try again in a little while." : error.message }); return; }
+    setJoinOpen(false);
+    toast({ text: newJoinBy ? <>Friends can join until <b>{formatShort(newJoinBy)}</b>.</> : "Friends can join for as long as it runs." });
     load();
   }
   async function leave() {
@@ -458,6 +467,7 @@ function ChallengePage({ id }: { id: string }) {
             <div className="h1" style={{ fontSize: 24 }}>{params.get("created") === "1" ? `${c!.name} is ready` : "Invite friends"}</div>
             <div className="muted" style={{ fontSize: 14, lineHeight: 1.45, maxWidth: 300 }}>
               {c!.join_mode === "approve" ? "Share the link. You approve everyone who asks to join." : "Anyone with the link can join."}
+              {joinByLabel(c!) && <> <b style={{ color: "var(--ink)" }}>{joinByLabel(c!)}.</b>{joinClosed(c!) && isCreator ? " Open it again from the menu." : ""}</>}
             </div>
           </div>
           <div className="field" style={{ paddingRight: 6 }}>
@@ -484,6 +494,23 @@ function ChallengePage({ id }: { id: string }) {
             <Icon name="check" stroke={2.4} />{newStart && newStart < c!.starts_on ? `Start ${formatShort(newStart)} instead` : "Save"}
           </button>
         </Sheet>
+        <Sheet open={joinOpen} onClose={() => setJoinOpen(false)} label="Last day to join">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="h1" style={{ fontSize: 22 }}>Last day to join</div>
+            <button className="icon-btn" aria-label="Close" onClick={() => setJoinOpen(false)}><Icon name="x" /></button>
+          </div>
+          <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>After this day nobody new can join, with a link or an invitation. People who are already in are not affected.</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="chip" aria-pressed={newJoinBy === null} onClick={() => setNewJoinBy(null)}>Any time</button>
+            {t <= c!.ends_on && <button className="chip" aria-pressed={newJoinBy === t} onClick={() => setNewJoinBy(t)}>Today</button>}
+            <label className="chip" aria-pressed={!!newJoinBy && newJoinBy !== t} style={{ position: "relative", cursor: "pointer" }}>
+              <Icon name="calendar" size={15} />{newJoinBy && newJoinBy !== t ? formatShort(newJoinBy) : "Pick a date"}
+              <input type="date" max={c!.ends_on} value={newJoinBy ?? t} onChange={(e) => e.target.value && setNewJoinBy(e.target.value > c!.ends_on ? c!.ends_on : e.target.value)} aria-label="Last day to join"
+                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
+            </label>
+          </div>
+          <button className="btn btn-primary" onClick={saveJoinBy}><Icon name="check" stroke={2.4} />Save</button>
+        </Sheet>
         <InviteSheet open={inviteOpen} onClose={() => setInviteOpen(false)} c={c!} userId={userId!} members={data!.members} onShareLink={() => { setInviteOpen(false); setShareOpen(true); }} beforeInvite={toGroup} />
         <Sheet open={menu} onClose={() => setMenu(false)} label="Challenge menu">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -503,6 +530,8 @@ function ChallengePage({ id }: { id: string }) {
             {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
             {isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewStart(c!.starts_on); setMenu(false); setStartOpen(true); }}>
               <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
+            {group && isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewJoinBy(c!.join_by ?? null); setMenu(false); setJoinOpen(true); }}>
+              <Icon name="clock" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Last day to join</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{c!.join_by ? (joinClosed(c!) ? `Closed ${formatShort(c!.join_by)} · open it again` : `Until ${formatShort(c!.join_by)}`) : "Any time while it runs"}</div></div></button>}
             {group && isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={newLink}>
               <Icon name="shield" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Make a new invite link</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>The old link stops working</div></div></button>}
             {!isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={leave}>
@@ -783,6 +812,7 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink, beforeInv
         </div>
       ) : <div className="muted" style={{ fontSize: 14 }}>Your friends on Frejas show up here. Share the link to bring in someone who isn&apos;t on Frejas yet.</div>}
       {c.solo && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>It stays just yours until you invite someone or share the link.</div>}
+      {joinClosed(c) && <div role="status" className="soft" style={{ padding: "10px 14px", borderRadius: 16, fontSize: 13.5, lineHeight: 1.4 }}><b>{joinByLabel(c)}.</b> Nobody new can join until the creator changes the last day to join in the challenge&apos;s menu.</div>}
       <button className="btn btn-soft" onClick={onShareLink}><Icon name="link" />Share a link instead</button>
     </Sheet>
   );
@@ -793,6 +823,7 @@ function InviteView({ c, onJoined }: { c: Challenge; onJoined: () => void }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [names, setNames] = useState<string[]>([]);
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
     supabase().rpc("get_invite", { p_token: c.invite_token }).then(({ data }) => setNames(((data as { member_names: string[] }[] | null)?.[0]?.member_names) ?? []));
   }, [c.invite_token]);
@@ -800,7 +831,7 @@ function InviteView({ c, onJoined }: { c: Challenge; onJoined: () => void }) {
     setBusy(true);
     const { error } = await supabase().rpc("join_challenge", { p_token: c.invite_token });
     setBusy(false);
-    if (!error) onJoined();
+    if (error) setErr(error.message); else onJoined();
   }
   async function decline() {
     const { data: s } = await supabase().auth.getSession();
@@ -815,12 +846,16 @@ function InviteView({ c, onJoined }: { c: Challenge; onJoined: () => void }) {
         <h1 className="h1">{c.name}</h1>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {isV2(c) && <Chip>{scheduleLabel(c)}</Chip>}<Chip>{formatShort(c.starts_on)} – {formatShort(c.ends_on)}</Chip>{isV2(c) && <Chip>{winRuleLabel(c.win_rule)}</Chip>}
+          {joinByLabel(c) && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 800, background: "var(--accent-bg)" }}><Icon name="clock" size={13} />{joinByLabel(c)}</span>}
         </div>
         {c.stake && <StakeLine stake={c.stake} />}
         <MembersIn names={names} />
       </section>
-      <button className="btn btn-primary" disabled={busy} onClick={accept}><Icon name="check" stroke={2.4} />{busy ? "Joining…" : "Join challenge"}</button>
-      <button className="btn btn-soft" onClick={decline}>Not now</button>
+      {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>{err}</div>}
+      {joinClosed(c)
+        ? <div className="soft" style={{ padding: "14px 16px", borderRadius: 20, fontSize: 14, lineHeight: 1.45 }}><b>Joining has closed.</b> The last day to join was {formatShort(c.join_by!)}. The person who made the challenge can open it again.</div>
+        : <button className="btn btn-primary" disabled={busy} onClick={accept}><Icon name="check" stroke={2.4} />{busy ? "Joining…" : "Join challenge"}</button>}
+      <button className="btn btn-soft" onClick={decline}>{joinClosed(c) ? "Remove the invitation" : "Not now"}</button>
     </main>
   );
 }

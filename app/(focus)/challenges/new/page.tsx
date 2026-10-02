@@ -101,6 +101,9 @@ function NewChallenge() {
   const [friends, setFriends] = useState<{ id: string; display_name: string; avatar_path: string | null; shared: number }[]>([]);
   const [invitees, setInvitees] = useState<Set<string>>(new Set());
   const [joinMode, setJoinMode] = useState<"approve" | "open">("approve");
+  // last day to join: "auto" = the start day, but never less than three days from now
+  const [joinPick, setJoinPick] = useState<"auto" | "start" | "soon" | "any" | "date">("auto");
+  const [joinDate, setJoinDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [myHabits, setMyHabits] = useState<Habit[]>([]);
@@ -110,6 +113,11 @@ function NewChallenge() {
   const preview = useMemo(() => (coverFile ? URL.createObjectURL(coverFile) : null), [coverFile]);
 
   const end = endFor(start, dur, customEnd);
+  const soon = addDays(t, 3) > end ? end : addDays(t, 3);
+  const autoPick: "start" | "soon" = start >= soon ? "start" : "soon";
+  const joinKind = joinPick === "auto" ? autoPick : joinPick;
+  const joinRaw = joinKind === "any" ? null : joinKind === "start" ? start : joinKind === "soon" ? soon : joinDate || soon;
+  const joinBy = joinRaw && joinRaw > end ? end : joinRaw;
   const total = solo ? 2 : 4;
 
   useEffect(() => { if (userId) myFriends(userId).then(setFriends).catch(() => {}); }, [userId]);
@@ -129,6 +137,7 @@ function NewChallenge() {
       const u = (c.unit ?? "") as Unit; setUnit(u); if (c.min_amount) setMinAmount(c.min_amount);
       setStart(c.starts_on < t ? t : c.starts_on); setDur("custom"); setCustomEnd(c.ends_on);
       setSameGoal(c.same_goal); setWin(c.win_rule); setStake(stakeParts(c.stake).text); setStakeEmoji(stakeParts(c.stake).emoji); setJoinMode(c.join_mode);
+      if (c.join_by) { setJoinPick("date"); setJoinDate(c.join_by); } else if (!c.solo && c.join_by === null) setJoinPick("any");
     });
   }, [draftId, t]);
 
@@ -137,6 +146,7 @@ function NewChallenge() {
     frequency: freq, days: freq === "specific_days" ? [...days].sort() : null, times_per_week: freq === "times_per_week" ? times : null,
     min_amount: unit ? minAmount : null, starts_on: start, ends_on: end, same_goal: sameGoal, win_rule: solo ? "finishers" : win,
     stake: solo ? null : joinStake(stakeEmoji, stake) || null, join_mode: joinMode, cover_preset: preset,
+    ...(solo ? {} : { join_by: joinBy }),
   });
 
   async function saveRow(status: "draft" | "active"): Promise<string> {
@@ -441,6 +451,20 @@ function NewChallenge() {
       <div role="radiogroup" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         <Radio title="Only people I approve" sub="Anyone else who opens the link asks to join, and you say yes." on={joinMode === "approve"} onClick={() => setJoinMode("approve")} />
         <Radio title="Anyone with the link" sub="Good for bigger groups, like a gym or a class." on={joinMode === "open"} onClick={() => setJoinMode("open")} />
+      </div>
+      <div className="label">Last day to join</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {start > t && <button className="chip" aria-pressed={joinKind === "start"} onClick={() => setJoinPick("start")}>Until it starts</button>}
+        <button className="chip" aria-pressed={joinKind === "soon"} onClick={() => setJoinPick("soon")}>{formatShort(soon)}</button>
+        <button className="chip" aria-pressed={joinKind === "any"} onClick={() => setJoinPick("any")}>Any time</button>
+        <label className="chip" aria-pressed={joinKind === "date"} style={{ position: "relative", cursor: "pointer" }}>
+          <Icon name="calendar" size={15} />{joinKind === "date" && joinDate ? formatShort(joinDate > end ? end : joinDate) : "Pick a date"}
+          <input type="date" min={t} max={end} value={joinDate || soon} onChange={(e) => { if (e.target.value) { setJoinDate(e.target.value); setJoinPick("date"); } }} aria-label="Last day to join"
+            style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
+        </label>
+      </div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>
+        {joinBy ? <>Friends can join until <b style={{ color: "var(--ink)" }}>{parse(joinBy).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}</b>. After that nobody new gets in.</> : "Friends can join for as long as the challenge runs."} You can change this later in the challenge&apos;s menu.
       </div>
       {errBox}
       <div style={{ flex: 1 }} />
