@@ -92,6 +92,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 
 .chip { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border: 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); white-space: nowrap; }
 .chip[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); box-shadow: none; }
+/* second-level chips (one challenge, one habit): smaller and quieter than the main row */
+.chip-sub { height: 30px; padding: 0 12px; border-radius: 15px; font-size: var(--t-sub); max-width: 220px; overflow: hidden; text-overflow: ellipsis; display: inline-block; line-height: 30px; flex-shrink: 0; }
+.chip-sub[aria-pressed="true"] { background: var(--soft); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--primary); }
 .tag { padding: 2px 9px; border-radius: 999px; background: var(--soft); font-size: var(--t-tag); font-weight: 700; }
 .tag-accent { background: var(--accent-bg); }
 

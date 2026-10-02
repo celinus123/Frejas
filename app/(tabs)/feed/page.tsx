@@ -15,6 +15,8 @@ import { addDays, iso, parse, today } from "@/lib/dates";
 import type { CheckIn, Habit } from "@/lib/types";
 
 type Item = { at: string; key: string; h: number; node: ReactNode };
+type Tab = "all" | "challenges" | "habits" | "updates";
+const TABS: [Tab, string][] = [["all", "All"], ["challenges", "Challenges"], ["habits", "Habits"], ["updates", "Updates"]];
 
 export default function Feed() {
   const { userId, profile, refreshProfile, toast } = useApp();
@@ -24,7 +26,8 @@ export default function Feed() {
   const [cards, setCards] = useState<FunCard[]>([]);
   const [chs, setChs] = useState<MyChallenge[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [filter, setFilter] = useState<string>("all");
+  const [tab, setTab] = useState<Tab>("all");               // what kind of thing to show
+  const [sub, setSub] = useState<string | null>(null);      // one challenge, or one habit, inside that kind
   const [photos, setPhotos] = useState<Record<string, string>>({});
   const [picker, setPicker] = useState<string | null>(null);   // the post whose reaction picker is open
   const [openKey, setOpenKey] = useState<string | null>(null); // the post that is opened
@@ -166,7 +169,8 @@ export default function Feed() {
   const columns = useMemo(() => {
     const items: Item[] = [];
     for (const p of posts ?? []) {
-      if (filter !== "all" && p.ci?.challenge_id !== filter) continue;
+      if (p.ci ? !(tab === "all" || (tab === "challenges" && (!sub || p.ci.challenge_id === sub)))
+               : !(tab === "all" || (tab === "habits" && (!sub || p.habits!.includes(sub))))) continue;
       const s = social[p.key] ?? noSocial;
       const h = p.habits ? 120 + Math.min(5, p.habits.length) * 26 : p.ci?.photo_path ? 290 : 130 + (p.ci?.comment?.length ?? 0) * 0.5;
       items.push({ at: p.at, key: p.key, h: h + (s.comments.length ? 26 : 0), node: (
@@ -174,22 +178,27 @@ export default function Feed() {
           pickerOpen={picker === p.key} setPicker={(o) => setPicker(o ? p.key : null)} onReact={(e) => onReact(p.ref, e)} onOpen={() => { setPicker(null); setOpenKey(p.key); }} />
       ) });
     }
-    if (filter === "all") for (const c of cards) if (c.kind !== "friendDay") items.push({ at: c.at, key: c.id, h: c.kind === "finished" ? 200 : 170, node: <Tile key={c.id} card={c} /> });
+    if (tab === "all" || tab === "updates") for (const c of cards) if (c.kind !== "friendDay") items.push({ at: c.at, key: c.id, h: c.kind === "finished" ? 200 : 170, node: <Tile key={c.id} card={c} /> });
     items.sort((a, b) => b.at.localeCompare(a.at));
     const cols: ReactNode[][] = [[], []], hs = [0, 0];
     for (const it of items) { const i = hs[0] <= hs[1] ? 0 : 1; cols[i].push(it.node); hs[i] += it.h + D.card.colGap; }
     return { cols, count: items.length };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts, cards, social, photos, filter, picker, who, userId]);
+  }, [posts, cards, social, photos, tab, sub, picker, who, userId]);
+
+  // the second row of chips: your challenges, or the habits that show up in the feed (most frequent first)
+  const subOptions: { id: string; label: string }[] = tab === "challenges"
+    ? chs.filter((c) => c.challenge.status !== "draft").map((c) => ({ id: c.challenge.id, label: c.challenge.name }))
+    : tab === "habits"
+      ? [...(posts ?? []).flatMap((p) => p.habits ?? []).reduce((m, h) => m.set(h, (m.get(h) ?? 0) + 1), new Map<string, number>()).entries()]
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([h]) => ({ id: h, label: h }))
+      : [];
 
   const opened = openKey ? (posts ?? []).find((p) => p.key === openKey) ?? null : null;
 
   return (
     <main className="page" style={{ paddingLeft: 16, paddingRight: 16 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 4px" }}>
-        <h1 className="h1">Feed</h1>
-        <button className="btn btn-soft btn-sm" onClick={() => setAddOpen(true)}><Icon name="plus" size={16} stroke={2.2} />Add friend</button>
-      </div>
+      <h1 className="h1" style={{ padding: "0 4px" }}>Feed</h1>
 
       <div className="no-scrollbar" style={{ display: "flex", gap: 14, overflowX: "auto", margin: "0 -16px", padding: "4px 20px 2px" }} aria-label="Friends">
         <button onClick={() => setAddOpen(true)} style={{ border: 0, background: "none", padding: 0, display: "flex", flexDirection: "column", alignItems: "center", gap: 5, flexShrink: 0, width: 56 }}>
@@ -205,17 +214,30 @@ export default function Feed() {
         {friends.length === 0 && <div className="muted" style={{ fontSize: 13, alignSelf: "center", lineHeight: 1.4, maxWidth: 220 }}>Add friends to see their check-ins and the habits they share.</div>}
       </div>
 
-      {chs.length > 0 && (
-        <div className="no-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto", margin: "0 -16px", padding: "2px 20px 6px" }}>
-          <button className="chip" aria-pressed={filter === "all"} onClick={() => setFilter("all")}>All</button>
-          {chs.filter((c) => c.challenge.status !== "draft").map((c) => <button key={c.challenge.id} className="chip" aria-pressed={filter === c.challenge.id} onClick={() => setFilter(c.challenge.id)}>{c.challenge.name}</button>)}
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div className="no-scrollbar" role="group" aria-label="Show" style={{ display: "flex", gap: 8, overflowX: "auto", margin: "0 -16px", padding: "2px 20px 6px" }}>
+          {TABS.map(([id, label]) => <button key={id} className="chip" aria-pressed={tab === id} onClick={() => { setTab(id); setSub(null); setPicker(null); }}>{label}</button>)}
         </div>
-      )}
+        {subOptions.length > 0 && (
+          <div className="no-scrollbar" role="group" aria-label={tab === "challenges" ? "Which challenge" : "Which habit"} style={{ display: "flex", gap: 6, overflowX: "auto", margin: "0 -16px", padding: "2px 20px 6px" }}>
+            <button className="chip chip-sub" aria-pressed={sub === null} onClick={() => setSub(null)}>{tab === "challenges" ? "All challenges" : "All habits"}</button>
+            {subOptions.map((o) => <button key={o.id} className="chip chip-sub" aria-pressed={sub === o.id} onClick={() => setSub(o.id)}>{o.label}</button>)}
+          </div>
+        )}
+      </div>
 
       {posts === null ? <div className="skeleton" style={{ height: 400 }} /> : columns.count === 0 ? (
-        <Empty icon="feed" title="Nothing here yet" text="Check-ins from your challenges, your weekly recap and what friends share show up here. Private habits never do.">
-          <button className="btn btn-primary" onClick={() => setAddOpen(true)}><Icon name="users" />Add a friend</button>
-        </Empty>
+        tab === "all" ? (
+          <Empty icon="feed" title="Nothing here yet" text="Check-ins from your challenges, your weekly recap and what friends share show up here. Private habits never do.">
+            <button className="btn btn-primary" onClick={() => setAddOpen(true)}><Icon name="users" />Add a friend</button>
+          </Empty>
+        ) : (
+          <div className="muted t-text" style={{ padding: "18px 6px", textAlign: "center" }}>
+            {tab === "challenges" ? (sub ? "No check-ins in this challenge yet." : "No check-ins yet. Check in to a challenge and it shows up here.")
+              : tab === "habits" ? "No shared habits ticked this week. Habits set to Friends show up here when they're ticked."
+                : "No updates right now. Recaps, goals reached and challenge news land here."}
+          </div>
+        )
       ) : (
         <div className="feed-cols">{columns.cols.map((col, i) => <div key={i} className="feed-col">{col}</div>)}</div>
       )}
