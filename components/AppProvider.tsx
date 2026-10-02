@@ -14,6 +14,8 @@ interface Ctx {
   refreshProfile: () => Promise<void>;
   setTheme: (t: Profile["theme"]) => void;
   toast: (t: Toast) => void;
+  reportsOpen: number | null;        // reports waiting; null for everyone who doesn't look after reports
+  refreshReports: () => void;
 }
 
 const AppCtx = createContext<Ctx | null>(null);
@@ -41,6 +43,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [toastState, setToast] = useState<Toast | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [reportsOpen, setReportsOpen] = useState<number | null>(null);
+  const uidNow = session?.user.id ?? null;
+  const refreshReports = useCallback(() => {
+    if (!uidNow) { setReportsOpen(null); return; }
+    Promise.resolve(supabase().rpc("open_reports")).then(({ data, error }) => setReportsOpen(error || typeof data !== "number" ? null : data), () => {});
+  }, [uidNow]);
+  const looksAfter = useRef(false);
+  looksAfter.current = reportsOpen !== null;
+  // asked when the app opens; whoever looks after reports is also asked each time the app comes back to the front
+  useEffect(() => {
+    refreshReports();
+    const onVis = () => { if (document.visibilityState === "visible" && looksAfter.current) refreshReports(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [refreshReports]);
 
   const loadProfile = useCallback(async (uid: string) => {
     const { data } = await supabase().from("profiles").select("*").eq("id", uid).maybeSingle();
@@ -118,7 +135,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refreshProfile: async () => { if (session) await loadProfile(session.user.id); },
     setTheme: (t) => { applyTheme(t); setProfile((p) => (p ? { ...p, theme: t } : p)); },
     toast,
-  }), [session, profile, loadProfile, toast]);
+    reportsOpen, refreshReports,
+  }), [session, profile, loadProfile, toast, reportsOpen, refreshReports]);
 
   const isPublic = PUBLIC.some((p) => path.startsWith(p));
   const blocked = !ready || (!session && !isPublic);

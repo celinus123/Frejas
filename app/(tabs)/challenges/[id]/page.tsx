@@ -760,6 +760,7 @@ function GroupStats({ c, st, checkins, userId }: { c: Challenge; st: Standing[];
 
 // ---------------------------------------------------------------- chat
 function Chat({ c, userId, members, onMore }: { c: Challenge; userId: string; members: Member[]; onMore: (t: SafetyTarget) => void }) {
+  const { toast } = useApp();
   const [msgs, setMsgs] = useState<Message[] | null>(null);
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -780,7 +781,8 @@ function Chat({ c, userId, members, onMore }: { c: Challenge; userId: string; me
     const body = text.trim();
     if (!body) return;
     setText("");
-    const { data } = await supabase().from("messages").insert({ challenge_id: c.id, user_id: userId, body }).select().single();
+    const { data, error } = await supabase().from("messages").insert({ challenge_id: c.id, user_id: userId, body }).select().single();
+    if (error) { setText(body); toast({ text: error.message || "Couldn't send the message. Try again." }); return; }   // the text comes back so nothing is lost
     if (data) setMsgs((ms) => (ms && !ms.some((m) => m.id === data.id) ? [...ms, data as Message] : ms));
   }
 

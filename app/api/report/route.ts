@@ -42,6 +42,8 @@ export async function POST(req: Request) {
     `Report: ${r.id}`,
     r.target_id ? `Reported row: ${r.target_id}` : null,
     `Sent: ${r.created_at}`,
+    "",
+    "Handle it here: https://frejas.app/admin/reports",
   ].filter((x) => x !== null).join("\n");
 
   const res = await fetch("https://api.resend.com/emails", {

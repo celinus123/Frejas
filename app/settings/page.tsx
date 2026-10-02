@@ -12,7 +12,7 @@ import type { Profile } from "@/lib/types";
 
 export default function Settings() {
   const router = useRouter();
-  const { userId, session, profile, refreshProfile, setTheme, toast } = useApp();
+  const { userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
   const [name, setName] = useState(profile?.display_name ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [typed, setTyped] = useState("");
@@ -24,12 +24,18 @@ export default function Settings() {
   if (!profile || !userId || !session) return null;
   const email = session.user.email ?? "";
 
-  async function update(fields: Partial<Profile>) {
-    await supabase().from("profiles").update(fields).eq("id", userId!);
+  async function update(fields: Partial<Profile>): Promise<boolean> {
+    const { error } = await supabase().from("profiles").update(fields).eq("id", userId!);
+    if (error) { toast({ text: error.message }); return false; }
     await refreshProfile();
+    return true;
   }
   async function theme(t: Profile["theme"]) { setTheme(t); await update({ theme: t }); }
-  async function saveName() { if (name.trim() && name.trim() !== profile!.display_name) { await update({ display_name: name.trim() }); toast({ text: "Name saved." }); } }
+  async function saveName() {
+    if (!name.trim() || name.trim() === profile!.display_name) return;
+    if (await update({ display_name: name.trim() })) toast({ text: "Name saved." });
+    else setName(profile!.display_name);
+  }
   async function photo(f: File) { const p = await uploadAvatar(f, userId!); await update({ avatar_path: p }); }
 
   async function exportData() {
@@ -100,6 +106,15 @@ export default function Settings() {
         <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setBlocksOpen(true)}>
           <Icon name="block" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Blocked people</div><span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{blocks.length || "None"}</span><Icon name="right" size={16} color="var(--ink-2)" /></button>
       </div>
+
+      {reportsOpen !== null && (
+        <>
+          <div className="label">Looking after Frejas</div>
+          <div className="card group">
+            <Link href="/admin/reports" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="flag" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Reports</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{reportsOpen ? `${reportsOpen} waiting · answer within 24 hours` : "Nothing is waiting"}</div></div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+          </div>
+        </>
+      )}
 
       <div className="label">About</div>
       <div className="card group">

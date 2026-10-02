@@ -6,7 +6,7 @@ export default function Terms() {
     <LegalPage title="Terms" updated="2 October 2026">
       <p>Frejas is a free app for tracking habits and running friendly challenges. By using it you agree to these terms.</p>
       <h2 className="h2">Be kind</h2>
-      <p>Only post photos and comments you have the right to share, and nothing hateful, sexual, threatening, or that exposes or bullies someone else. There is no tolerance for this kind of content or for abusive behaviour.</p>
+      <p>Only post photos and comments you have the right to share, and nothing hateful, sexual, threatening, or that exposes or bullies someone else. There is no tolerance for this kind of content or for abusive behaviour. Hate words and threats are stopped before they are posted.</p>
       <p>You can report a post, a comment, a message or a person from the three dots on it, and block anyone from the same place. We look at every report within 24 hours, remove what breaks these rules, and close the accounts of people who break them.</p>
       <h2 className="h2">Stakes are between friends</h2>
       <p>"What's at stake" is a friendly promise between the people in a challenge. Frejas doesn't handle money and isn't responsible for whether stakes are paid.</p>
