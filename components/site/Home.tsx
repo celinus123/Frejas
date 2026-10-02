@@ -3,7 +3,8 @@ import { FrejasMark } from "@/components/Logo";
 import { APP_STORE_URL, SiteFoot, SiteHead } from "@/components/site/SiteChrome";
 
 function Phone({ src, alt }: { src: string; alt: string }) {
-  return <div className="s-phone"><img src={`/web/${src}.jpg`} alt={alt} width={390} height={844} /></div>;
+  // loaded only when shown: someone on their way into the app never sees this page, and then never downloads its pictures
+  return <div className="s-phone"><img src={`/web/${src}.jpg`} alt={alt} width={390} height={844} loading="lazy" decoding="async" /></div>;
 }
 
 /** The way to the app: a button once it is in the App Store, a note until then. */
@@ -45,7 +46,7 @@ export function Home() {
             </div>
           </div>
           <div className="s-stage">
-            <div className="s-phone back" aria-hidden="true"><img src="/web/challenge.jpg" alt="" width={390} height={844} /></div>
+            <div className="s-phone back" aria-hidden="true"><img src="/web/challenge.jpg" alt="" width={390} height={844} loading="lazy" decoding="async" /></div>
             <Phone src="today" alt="The Today screen in Frejas: this week, today's progress and the habits to tick off" />
           </div>
         </div>
