@@ -8,6 +8,8 @@ import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { uploadAvatar } from "@/lib/photos";
 import { myBlocks, unblockUser, type Blocked } from "@/lib/safety";
+import { SwipeRow } from "@/components/SwipeRow";
+import { ReminderField } from "@/components/ReminderField";
 import { NOTE_KINDS, enablePush, forgetPush, hhmm, pushDetails, pushState, syncReminders, testPush, type PushState } from "@/lib/push";
 import type { Habit, Profile } from "@/lib/types";
 
@@ -36,6 +38,33 @@ export default function Settings() {
         when: h.frequency === "specific_days" && h.days?.length ? [...h.days].sort().map((d) => DAY[d - 1]).join(", ") : "Every day",
       }))));
   }, [userId]);
+  const [openRem, setOpenRem] = useState<string | null>(null);     // the row that is swiped open
+  const [editRem, setEditRem] = useState<Reminder | null>(null);   // the reminder whose time is being changed
+  const [editTime, setEditTime] = useState("");
+  const resync = async () => {
+    const { data } = await supabase().from("habits").select("id, name, frequency, days, reminder_time, archived_at").eq("owner_id", userId!);
+    syncReminders((data ?? []) as Parameters<typeof syncReminders>[0]);
+  };
+  // removing takes it off the habit and out of the list (with a way to undo it)
+  async function removeReminder(r: Reminder) {
+    const { error } = await supabase().from("habits").update({ reminder_time: null }).eq("id", r.id);
+    if (error) { toast({ text: error.message }); return; }
+    const before = reminders ?? [];
+    setReminders(before.filter((x) => x.id !== r.id)); setEditRem(null);
+    toast({ text: <>Reminder for <b>{r.name}</b> removed.</>, undo: async () => { await supabase().from("habits").update({ reminder_time: r.time }).eq("id", r.id); setReminders(before.map((x) => (x.id === r.id ? { ...x, on: true } : x))); resync(); } });
+    resync();
+  }
+  async function saveTime() {
+    const r = editRem;
+    if (!r) return;
+    if (!editTime) return removeReminder(r);
+    const { error } = await supabase().from("habits").update({ reminder_time: editTime }).eq("id", r.id);
+    if (error) { toast({ text: error.message }); return; }
+    setReminders((reminders ?? []).map((x) => (x.id === r.id ? { ...x, time: editTime, on: true } : x)).sort((a, b) => a.time.localeCompare(b.time)));
+    setEditRem(null);
+    toast({ text: <>You&apos;ll be reminded at <b>{editTime}</b>.</> });
+    resync();
+  }
   // switching one off removes the time from the habit; it stays in the list until you leave, so it can be switched back on
   async function setReminder(ids: string[], on: boolean) {
     const now = reminders ?? [];
@@ -44,8 +73,7 @@ export default function Settings() {
       if (error) { toast({ text: error.message }); return; }
     }
     setReminders(now.map((r) => (ids.includes(r.id) ? { ...r, on } : r)));
-    const { data } = await supabase().from("habits").select("id, name, frequency, days, reminder_time, archived_at").eq("owner_id", userId!);
-    syncReminders((data ?? []) as Parameters<typeof syncReminders>[0]);
+    resync();
   }
   const [phone, setPhone] = useState<{ registered: boolean; problem: string | null } | null>(null);
   const checkPhone = () => setTimeout(() => pushDetails().then(setPhone), 2500);   // registering takes the phone a moment
@@ -153,19 +181,22 @@ export default function Settings() {
       {push === "unavailable" && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>Notifications arrive in the iPhone app.</div>}
 
       <div className="label">Reminders</div>
-      {reminders && reminders.length > 0 && (
-        <div className="card group">
-          {reminders.map((r) => (
-            <div key={r.id} className="row" style={{ opacity: r.on ? 1 : 0.6 }}>
-              <Icon name="clock" color="var(--primary)" />
-              <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{r.when} at {r.time}</div></div>
-              <Switch on={r.on} onChange={(v) => setReminder([r.id], v)} label={`Reminder for ${r.name}`} />
-            </div>
-          ))}
-        </div>
-      )}
+      {reminders?.map((r) => (
+        <SwipeRow key={r.id} label={`the reminder for ${r.name}`} open={openRem === r.id} onOpenChange={(o) => setOpenRem(o ? r.id : null)}
+          onEdit={() => { setEditTime(r.time); setEditRem(r); }} onDelete={() => removeReminder(r)}>
+          <div className="card" style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 14px 9px 16px", borderRadius: 20, minHeight: 60 }}>
+            <Icon name="clock" color="var(--primary)" />
+            {/* a tap opens the same thing as Edit, for anyone who doesn't think of swiping */}
+            <button onClick={() => { setEditTime(r.time); setEditRem(r); }} aria-label={`Change the reminder for ${r.name}`} style={{ flex: 1, minWidth: 0, border: 0, background: "none", padding: 0, textAlign: "left", opacity: r.on ? 1 : 0.55 }}>
+              <span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</span>
+              <span className="muted" style={{ display: "block", fontSize: "var(--t-sub)" }}>{r.when} at {r.time}</span>
+            </button>
+            <Switch on={r.on} onChange={(v) => setReminder([r.id], v)} label={`Reminder for ${r.name}`} />
+          </div>
+        </SwipeRow>
+      ))}
       {reminders && reminders.filter((r) => r.on).length > 1 && <button className="btn" style={{ background: "none", color: "var(--ink-2)", height: 36 }} onClick={() => setReminder(reminders.filter((r) => r.on).map((r) => r.id), false)}>Turn all reminders off</button>}
-      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>{reminders?.length ? "To change the time, open the habit, or the menu of the challenge." : "No reminders yet. Set one when you edit a habit, or in the menu of a challenge."}</div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>{reminders?.length ? "Swipe a reminder to the left to change the time or remove it." : "No reminders yet. Set one when you edit a habit, or in the menu of a challenge."}</div>
 
       <div className="label">Privacy</div>
       <div className="card group">
@@ -210,6 +241,20 @@ export default function Settings() {
         </section>
       )}
       <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1{process.env.NEXT_PUBLIC_BUILD_ID && process.env.NEXT_PUBLIC_BUILD_ID !== "dev" ? ` · ${process.env.NEXT_PUBLIC_BUILD_ID.slice(0, 7)}` : ""}</div>
+
+      <Sheet open={!!editRem} onClose={() => setEditRem(null)} label="Change the reminder">
+        {editRem && (
+          <>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div className="h1" style={{ fontSize: 22, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{editRem.name}</div>
+              <button className="icon-btn" aria-label="Close" onClick={() => setEditRem(null)}><Icon name="x" /></button>
+            </div>
+            <ReminderField value={editTime} onChange={setEditTime} when={editRem.when} />
+            <button className="btn btn-primary" onClick={saveTime}><Icon name="check" stroke={2.4} />{editTime ? "Save" : "Remove the reminder"}</button>
+            <button className="btn btn-soft" onClick={() => removeReminder(editRem)}>Remove the reminder</button>
+          </>
+        )}
+      </Sheet>
 
       <Sheet open={blocksOpen} onClose={() => setBlocksOpen(false)} label="Blocked people">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
