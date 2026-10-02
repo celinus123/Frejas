@@ -42,3 +42,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 }
+
+/// The screen that hosts the web view. It only adjusts how scrolling looks and feels.
+class MainViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        guard let scroll = webView?.scrollView else { return }
+        scroll.showsVerticalScrollIndicator = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.decelerationRate = .normal
+    }
+}

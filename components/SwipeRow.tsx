@@ -18,6 +18,7 @@ export function SwipeRow({ open, onOpenChange, onEdit, onDelete, label, children
 }) {
   const start = useRef<{ x: number; y: number; base: number } | null>(null);
   const moved = useRef(false);
+  const last = useRef<number | null>(null);   // where the row is right now, without waiting for a redraw
   const [drag, setDrag] = useState<number | null>(null);
   const x = drag ?? (open ? OPEN : 0);
 
@@ -34,13 +35,15 @@ export function SwipeRow({ open, onOpenChange, onEdit, onDelete, label, children
       if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { start.current = null; return; } // scrolling
       if (Math.abs(dx) < 8) return;
       moved.current = true;
-      (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+      try { (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId); } catch { /* the finger is already gone */ }
     }
-    setDrag(Math.max(OPEN - 30, Math.min(0, s.base + dx)));
+    last.current = Math.max(OPEN - 30, Math.min(0, s.base + dx));
+    setDrag(last.current);
   }
   function up() {
-    if (start.current && moved.current && drag !== null) onOpenChange(drag < OPEN / 2);
+    if (start.current && moved.current && last.current !== null) onOpenChange(last.current < OPEN / 2);
     start.current = null;
+    last.current = null;
     setDrag(null);
   }
 
@@ -62,7 +65,7 @@ export function SwipeRow({ open, onOpenChange, onEdit, onDelete, label, children
           // a drag, or a tap while open, should not also open the habit or tick it
           if (moved.current || open) { e.preventDefault(); e.stopPropagation(); moved.current = false; if (open) onOpenChange(false); }
         }}
-        style={{ position: "relative", transform: `translateX(${x}px)`, transition: drag === null ? "transform .22s ease" : "none", touchAction: "pan-y" }}>
+        style={{ position: "relative", transform: x ? `translateX(${x}px)` : undefined, transition: drag === null ? "transform .22s ease" : "none", touchAction: "pan-y" }}>
         {children}
       </div>
     </div>

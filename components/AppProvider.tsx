@@ -123,8 +123,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isPublic = PUBLIC.some((p) => path.startsWith(p));
   const blocked = !ready || (!session && !isPublic);
 
+  // has the page scrolled? (only flips when crossing the top, so it costs nothing while scrolling)
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 6);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, [path]);
+
   return (
     <AppCtx.Provider value={value}>
+      <div className={scrolled ? "statusbar-cover on" : "statusbar-cover"} aria-hidden="true" />
       {blocked ? <div className="page"><div className="skeleton" style={{ height: 120 }} /><div className="skeleton" style={{ height: 300 }} /></div> : children}
       {toastState && (
         <div role="status" style={{ position: "fixed", left: 16, right: 16, bottom: "calc(env(safe-area-inset-bottom) + 100px)", zIndex: 50, display: "flex", justifyContent: "center" }}>

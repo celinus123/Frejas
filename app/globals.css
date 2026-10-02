@@ -51,6 +51,9 @@ html, body { background: var(--bg); color: var(--ink); }
 /* No sideways drift and no double-tap zoom; text keeps its size when the phone is turned. */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
 body { overflow-x: clip; }
+/* No scroll line down the side of the page (the native apps also switch it off themselves). */
+html, body { scrollbar-width: none; }
+html::-webkit-scrollbar, body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 body {
   font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -130,7 +133,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .skeleton { background: var(--soft-l); border-radius: 20px; animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .5; } }
 .no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar { scrollbar-width: none; overflow-y: hidden; overscroll-behavior-x: contain; }
+/* Covers the strip behind the clock once the page has scrolled, so content doesn't slide under it. */
+.statusbar-cover { position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 36; opacity: 0; transition: opacity .15s; pointer-events: none; }
+.statusbar-cover.on { opacity: 1; }
 
 /* ---------------------------------------------------------------- feed posts (sizes from lib/design.ts) */
 .em { font-family: "Apple Color Emoji", "Noto Color Emoji", "Segoe UI Emoji", sans-serif; font-style: normal; font-weight: 400; line-height: 1; }
@@ -150,7 +156,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .cmt { display: flex; align-items: center; gap: calc(var(--c-pad) + 1px); padding: var(--c-pad) calc(var(--c-pad) + 6px) var(--c-pad) var(--c-pad); border: 0; text-align: left;
   border-radius: calc(var(--a-comment) / 2 + var(--c-pad)); font-size: var(--t-comment); line-height: 1.25; }
 .cmt > span { display: -webkit-box; -webkit-line-clamp: var(--c-lines); -webkit-box-orient: vertical; overflow: hidden; }
-.cmt.on { position: absolute; left: var(--c-x); bottom: var(--c-y); max-width: min(var(--c-w), calc(100% - var(--c-x) - 6px)); background: rgba(30, 8, 18, var(--c-op)); color: #fff; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.cmt.on { position: absolute; left: var(--c-x); bottom: var(--c-y); max-width: min(var(--c-w), calc(100% - var(--c-x) - 6px)); background: rgba(30, 8, 18, var(--c-op)); color: #fff; }
 .cmt.in { align-self: flex-start; max-width: 100%; background: var(--surface); color: var(--ink); }
 .card .cmt.in { background: var(--soft-l); }
 .post-body { padding: calc(var(--card-pad) - 2px) var(--card-pad); display: flex; flex-direction: column; gap: var(--row-gap); }
