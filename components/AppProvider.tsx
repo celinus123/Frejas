@@ -16,6 +16,8 @@ interface Ctx {
   refreshProfile: () => Promise<void>;
   setTheme: (t: Profile["theme"]) => void;
   toast: (t: Toast) => void;
+  unread: number;                    // notifications in the list that haven't been read
+  refreshUnread: () => void;
   reportsOpen: number | null;        // reports waiting; null for everyone who doesn't look after reports
   refreshReports: () => void;
 }
@@ -57,6 +59,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [uidNow]);
   const looksAfter = useRef(false);
   looksAfter.current = reportsOpen !== null;
+  const [unread, setUnread] = useState(0);
+  const refreshUnread = useCallback(() => {
+    if (!uidNow) { setUnread(0); return; }
+    Promise.resolve(supabase().from("notifications").select("id", { count: "exact", head: true }).is("read_at", null)).then(({ count, error }) => setUnread(error ? 0 : count ?? 0), () => {});
+  }, [uidNow]);
+  useEffect(() => {
+    refreshUnread();
+    const onVis = () => { if (document.visibilityState === "visible") refreshUnread(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [refreshUnread]);
   // in the iPhone app: keep this phone known for notifications, and open the right page when one is tapped
   useEffect(() => { if (uidNow) startPush((url) => router.push(url)); }, [uidNow, router]);
   // asked when the app opens; whoever looks after reports is also asked each time the app comes back to the front
@@ -143,8 +156,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     refreshProfile: async () => { if (session) await loadProfile(session.user.id); },
     setTheme: (t) => { applyTheme(t); setProfile((p) => (p ? { ...p, theme: t } : p)); },
     toast,
+    unread, refreshUnread,
     reportsOpen, refreshReports,
-  }), [session, ready, profile, loadProfile, toast, reportsOpen, refreshReports]);
+  }), [session, ready, profile, loadProfile, toast, unread, refreshUnread, reportsOpen, refreshReports]);
 
   const blocked = path !== "/" && !SITE.some((p) => path.startsWith(p)) && (!ready || (!session && !open(path)));
 

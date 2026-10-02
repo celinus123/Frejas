@@ -85,17 +85,20 @@ export async function POST(req: Request) {
     admin.from("blocks").select("blocker_id").or(`and(blocker_id.eq.${me},blocked_id.eq.${found.to}),and(blocker_id.eq.${found.to},blocked_id.eq.${me})`).limit(1),
   ]);
   if (!them) return skip("no such person");
-  if (((them.notify_off as string[] | null) ?? []).includes(kind)) return skip("switched off");
   if (blocks?.length) return skip("blocked");
-  if (found.challenge) {
+  let quiet: string | null = ((them.notify_off as string[] | null) ?? []).includes(kind) ? "switched off" : null;
+  if (!quiet && found.challenge) {
     const { data: m } = await admin.from("challenge_members").select("muted").eq("challenge_id", found.challenge).eq("user_id", found.to).maybeSingle();
-    if (m?.muted) return skip("muted");
+    if (m?.muted) quiet = "muted";
   }
 
   // each thing is told once
   const { error: dup } = await admin.from("push_log").insert({ key: found.key, kind, to_user: found.to });
   if (dup) return skip("already told");
   const noted = (note: string, sent = 0) => admin.from("push_log").update({ sent, note }).eq("key", found.key).then(() => {}, () => {});
+  // it always goes into the list in the app; the switches and a muted challenge only decide whether the phone is told
+  await admin.from("notifications").insert({ user_id: found.to, kind, title: found.note.title, body: found.note.body, url: found.note.url });
+  if (quiet) { await noted(quiet); return skip(quiet); }
   if (!apnsConfigured()) { await noted("no push key on the server"); return skip("no push key yet"); }
 
   const { data: phones } = await admin.from("push_tokens").select("token").eq("user_id", found.to).eq("platform", "ios");
