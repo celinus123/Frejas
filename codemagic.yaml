@@ -12,7 +12,7 @@ workflows:
         distribution_type: app_store
         bundle_identifier: app.frejas
       vars:
-        APP_STORE_APPLE_ID: "0000000000"   # replace with the Apple ID of the app (App Store Connect → App Information)
+        APP_STORE_APPLE_ID: "6818469944"   # the app's Apple ID (App Store Connect → App Information)
       node: 22
       xcode: latest
     scripts:
