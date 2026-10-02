@@ -107,6 +107,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .btn-white { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
 .btn-sm { height: 40px; padding: 0 16px; border-radius: 20px; font-size: 13.5px; }
 
+/* A button that holds nothing but an icon always has the icon in its middle, whatever its shape. */
+button:has(> svg:only-child) { display: inline-flex; align-items: center; justify-content: center; }
+/* the round plus and minus beside a number */
+.round-btn { width: 40px; height: 40px; padding: 0; border-radius: 50%; border: 0; background: var(--soft-l); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .icon-btn { width: 44px; height: 44px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow); display: inline-flex; align-items: center; justify-content: center; border: 0; flex-shrink: 0; position: relative; }
 
 .chip { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; border: 0; background: var(--surface); color: var(--ink); box-shadow: var(--shadow); white-space: nowrap; }

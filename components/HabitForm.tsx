@@ -207,9 +207,9 @@ export function HabitForm({ habit }: { habit?: Habit }) {
       )}
       {freq === "times_per_week" && (
         <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderRadius: 16 }}>
-          <button aria-label="Fewer" onClick={() => setTimes((x) => Math.max(1, x - 1))} style={{ width: 40, height: 40, borderRadius: "50%", border: 0, background: "var(--soft-l)" }}><Icon name="minus" /></button>
+          <button aria-label="Fewer" onClick={() => setTimes((x) => Math.max(1, x - 1))} className="round-btn"><Icon name="minus" /></button>
           <div style={{ flex: 1, textAlign: "center" }}><span className="font-display" style={{ fontSize: 30, fontWeight: 600 }}>{times}</span><span className="muted" style={{ fontSize: 14 }}> times a week</span></div>
-          <button aria-label="More" onClick={() => setTimes((x) => Math.min(7, x + 1))} style={{ width: 40, height: 40, borderRadius: "50%", border: 0, background: "var(--soft-l)" }}><Icon name="plus" /></button>
+          <button aria-label="More" onClick={() => setTimes((x) => Math.min(7, x + 1))} className="round-btn"><Icon name="plus" /></button>
         </div>
       )}
       <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.4 }}>
