@@ -170,7 +170,7 @@ export default function Settings() {
           <button className="btn" style={{ background: "var(--ink)", color: "var(--bg)" }} disabled={busy || typed.trim().toLowerCase() !== email.toLowerCase()} onClick={deleteAccount}>{busy ? "Deleting…" : "Delete my account"}</button>
         </section>
       )}
-      <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1</div>
+      <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1{process.env.NEXT_PUBLIC_BUILD_ID && process.env.NEXT_PUBLIC_BUILD_ID !== "dev" ? ` · ${process.env.NEXT_PUBLIC_BUILD_ID.slice(0, 7)}` : ""}</div>
 
       <Sheet open={blocksOpen} onClose={() => setBlocksOpen(false)} label="Blocked people">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
