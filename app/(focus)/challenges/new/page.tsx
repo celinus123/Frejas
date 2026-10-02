@@ -5,6 +5,7 @@ import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { Avatar, Sheet } from "@/components/ui";
 import { Cover, PRESETS } from "@/components/Cover";
+import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import { addDays, formatShort, iso, parse, startOfWeek, today } from "@/lib/dates";
 import { alignHabitStart, backfillCheckins, loadHabits, myFriends } from "@/lib/data";
@@ -202,7 +203,8 @@ function NewChallenge() {
       if (me && me.code !== "23505") throw me;
       if (linkTo) await backfillCheckins({ id: cid, starts_on: start, ends_on: end, unit: unit || null }, linkTo, userId).catch(() => 0);
       if (!solo && invitees.size) {
-        await supabase().from("challenge_invites").insert([...invitees].map((u) => ({ challenge_id: cid, user_id: u, invited_by: userId })));
+        const { error: ie } = await supabase().from("challenge_invites").insert([...invitees].map((u) => ({ challenge_id: cid, user_id: u, invited_by: userId })));
+        if (!ie) for (const u of invitees) notify({ type: "invite", challenge_id: cid, user_id: u });
       }
       router.replace(`/challenges/${cid}${solo ? "" : "?created=1"}`);
     } catch (e) {

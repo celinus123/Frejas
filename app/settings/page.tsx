@@ -8,7 +8,7 @@ import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { uploadAvatar } from "@/lib/photos";
 import { myBlocks, unblockUser, type Blocked } from "@/lib/safety";
-import { NOTE_KINDS, enablePush, forgetPush, pushState, type PushState } from "@/lib/push";
+import { NOTE_KINDS, enablePush, forgetPush, pushDetails, pushState, testPush, type PushState } from "@/lib/push";
 import type { Profile } from "@/lib/types";
 
 export default function Settings() {
@@ -23,7 +23,9 @@ export default function Settings() {
   const [blocksOpen, setBlocksOpen] = useState(false);
   useEffect(() => { if (userId) myBlocks().then(setBlocks); }, [userId]);
   const [push, setPush] = useState<PushState | null>(null);
-  useEffect(() => { pushState().then(setPush); }, []);
+  const [phone, setPhone] = useState<{ registered: boolean; problem: string | null } | null>(null);
+  const checkPhone = () => setTimeout(() => pushDetails().then(setPhone), 2500);   // registering takes the phone a moment
+  useEffect(() => { pushState().then((s) => { setPush(s); if (s === "granted") pushDetails().then(setPhone); }); }, []);
   if (!profile || !userId || !session) return null;
   const email = session.user.email ?? "";
 
@@ -103,8 +105,20 @@ export default function Settings() {
       <div className="label">Notifications</div>
       <div className="card group">
         {push === "prompt" && (
-          <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={async () => setPush(await enablePush())}>
+          <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={async () => { const s = await enablePush(); setPush(s); if (s === "granted") checkPhone(); }}>
             <Icon name="bell" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Turn on notifications</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Your phone asks once. You choose below what you hear about.</div></div><Icon name="right" size={16} color="var(--ink-2)" /></button>
+        )}
+        {push === "old-app" && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Update Frejas to get notifications</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>This version of the app can&apos;t receive them yet.</div></div></div>}
+        {push === "granted" && (
+          <div className="row"><Icon name="bell" color="var(--primary)" />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{phone?.registered ? "Notifications are on" : "This phone isn't registered yet"}</div>
+              {!phone?.registered && <div className="muted" style={{ fontSize: "var(--t-sub)", wordBreak: "break-word" }}>{phone?.problem ?? "Tap Try again."}</div>}
+            </div>
+            {phone?.registered
+              ? <button className="btn btn-soft btn-sm" onClick={async () => toast({ text: await testPush() })}>Send a test</button>
+              : <button className="btn btn-soft btn-sm" onClick={async () => { await enablePush(); checkPhone(); }}>Try again</button>}
+          </div>
         )}
         {push === "denied" && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Notifications are off</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Turn them on for Frejas in your iPhone&apos;s Settings.</div></div></div>}
         {NOTE_KINDS.map(([id, label]) => {

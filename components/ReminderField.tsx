@@ -20,6 +20,7 @@ export function ReminderField({ value, onChange, when }: { value: string; onChan
         {value && <button type="button" onClick={() => onChange("")} aria-label="Remove the reminder" className="muted" style={{ width: 36, height: 36, border: 0, background: "none" }}><Icon name="x" size={16} stroke={2.2} /></button>}
       </div>
       {value && state === "unavailable" && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Reminders arrive in the iPhone app.</div>}
+      {value && state === "old-app" && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", color: "var(--ink)" }}>Update Frejas to get reminders. This version of the app can&apos;t show them yet.</div>}
       {value && state === "denied" && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", color: "var(--ink)" }}>Notifications are off for Frejas. Turn them on in your iPhone&apos;s Settings to get this reminder.</div>}
     </>
   );

@@ -27,27 +27,30 @@ function bearer(): string {
 export interface Note { title: string; body: string; url: string }
 
 /** Sends one notification to each phone. `gone` lists phones Apple says no longer have the app, so they can be forgotten. */
-export async function sendApns(tokens: string[], note: Note): Promise<{ sent: number; gone: string[] }> {
-  if (!apnsConfigured() || !tokens.length) return { sent: 0, gone: [] };
-  const auth = `bearer ${bearer()}`;
+export async function sendApns(tokens: string[], note: Note): Promise<{ sent: number; gone: string[]; problems: string[] }> {
+  if (!apnsConfigured() || !tokens.length) return { sent: 0, gone: [], problems: [] };
+  let auth: string;
+  try { auth = `bearer ${bearer()}`; } catch (e) { return { sent: 0, gone: [], problems: [`the push key can't be read: ${(e as Error).message}`] }; }
   const payload = JSON.stringify({ aps: { alert: { title: note.title, body: note.body }, sound: "default" }, url: note.url });
   const client = http2.connect(HOST());
   client.on("error", () => { /* each request below reports its own failure */ });
+  const problems: string[] = [];
+  const said = (status: number, text: string) => { let why = ""; try { why = (JSON.parse(text) as { reason?: string }).reason ?? ""; } catch { /* no reason given */ } return `${status || "no answer"}${why ? ` ${why}` : ""}`; };
   const one = (token: string) => new Promise<"sent" | "gone" | "failed">((resolve) => {
     let status = 0, text = "";
-    const timer = setTimeout(() => { req.close(); resolve("failed"); }, 8000);
+    const timer = setTimeout(() => { req.close(); problems.push("no answer from Apple"); resolve("failed"); }, 8000);
     const req = client.request({
       ":method": "POST", ":path": `/3/device/${token}`, authorization: auth,
       "apns-topic": TOPIC, "apns-push-type": "alert", "apns-priority": "10", "content-type": "application/json",
     });
     req.on("response", (h) => { status = Number(h[":status"]); });
     req.on("data", (d) => { text += d; });
-    req.on("end", () => { clearTimeout(timer); resolve(status === 200 ? "sent" : status === 410 || /BadDeviceToken|Unregistered|DeviceTokenNotForTopic/.test(text) ? "gone" : "failed"); });
-    req.on("error", () => { clearTimeout(timer); resolve("failed"); });
+    req.on("end", () => { clearTimeout(timer); if (status !== 200) problems.push(said(status, text)); resolve(status === 200 ? "sent" : status === 410 || /BadDeviceToken|Unregistered|DeviceTokenNotForTopic/.test(text) ? "gone" : "failed"); });
+    req.on("error", (e) => { clearTimeout(timer); problems.push(`connection: ${e.message}`); resolve("failed"); });
     req.end(payload);
   });
   try {
     const results = await Promise.all(tokens.map(one));
-    return { sent: results.filter((r) => r === "sent").length, gone: tokens.filter((_, i) => results[i] === "gone") };
+    return { sent: results.filter((r) => r === "sent").length, gone: tokens.filter((_, i) => results[i] === "gone"), problems: [...new Set(problems)] };
   } finally { client.close(); }
 }

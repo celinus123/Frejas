@@ -1,5 +1,5 @@
 "use client";
-import { isIOSApp as isNative } from "./native";
+import { hasPlugin, isIOSApp as isNative } from "./native";
 import { supabase } from "./supabase";
 import type { Habit } from "./types";
 
@@ -9,7 +9,8 @@ import type { Habit } from "./types";
  *  · your own reminders for a habit: set on the phone itself, so they also arrive without a connection
  * Both only exist in the iPhone app. In a browser every function here does nothing.
  */
-export type PushState = "unavailable" | "prompt" | "granted" | "denied";
+// unavailable = a browser · old-app = an installed app from before notifications were built in
+export type PushState = "unavailable" | "old-app" | "prompt" | "granted" | "denied";
 export const NOTE_KINDS = [
   ["invite", "Invitations to challenges"],
   ["request", "Requests to join your challenges"],
@@ -19,12 +20,14 @@ export const NOTE_KINDS = [
 export type NoteKind = (typeof NOTE_KINDS)[number][0];
 
 const TOKEN_KEY = "frejas-push-token";
+const PROBLEM_KEY = "frejas-push-problem";
 const push = async () => (await import("@capacitor/push-notifications")).PushNotifications;
 const local = async () => (await import("@capacitor/local-notifications")).LocalNotifications;
 const asState = (s: string): PushState => (s === "granted" ? "granted" : s === "denied" ? "denied" : "prompt");
 
 export async function pushState(): Promise<PushState> {
   if (!isNative()) return "unavailable";
+  if (!hasPlugin("PushNotifications")) return "old-app";
   try { return asState((await (await push()).checkPermissions()).receive); } catch { return "unavailable"; }
 }
 
@@ -36,9 +39,11 @@ export async function startPush(open: (url: string) => void) {
   try {
     const P = await push();
     await P.addListener("registration", (t) => {
-      try { localStorage.setItem(TOKEN_KEY, t.value); } catch {}
-      supabase().rpc("save_push_token", { p_token: t.value, p_platform: "ios" }).then(() => {}, () => {});
+      try { localStorage.setItem(TOKEN_KEY, t.value); localStorage.removeItem(PROBLEM_KEY); } catch {}
+      supabase().rpc("save_push_token", { p_token: t.value, p_platform: "ios" }).then(({ error }) => { if (error) try { localStorage.setItem(PROBLEM_KEY, `Couldn't save this phone: ${error.message}`); } catch {} }, () => {});
     });
+    // the phone could not get an address from Apple (for example when the app was built without the right to send notifications)
+    await P.addListener("registrationError", (e) => { try { localStorage.setItem(PROBLEM_KEY, e.error || "The phone couldn't register with Apple."); } catch {} });
     await P.addListener("pushNotificationActionPerformed", (a) => { const url = (a.notification.data as { url?: string } | undefined)?.url; if (url && url.startsWith("/")) open(url); });
     const L = await local();
     await L.addListener("localNotificationActionPerformed", (a) => { const url = (a.notification.extra as { url?: string } | undefined)?.url; if (url && url.startsWith("/")) open(url); });
@@ -56,6 +61,26 @@ export async function enablePush(): Promise<PushState> {
     if (s === "granted") await P.register();
     return asState(s);
   } catch { return "unavailable"; }
+}
+
+/** Where this phone stands: is it registered, and if not, what the phone or Apple said. For the Settings page. */
+export async function pushDetails(): Promise<{ registered: boolean; problem: string | null }> {
+  let token: string | null = null, problem: string | null = null;
+  try { token = localStorage.getItem(TOKEN_KEY); problem = localStorage.getItem(PROBLEM_KEY); } catch {}
+  if (!token) return { registered: false, problem };
+  const { data } = await supabase().from("push_tokens").select("token").eq("token", token).maybeSingle();
+  return { registered: !!data, problem };
+}
+
+/** Sends a notification to your own phone and says what happened. */
+export async function testPush(): Promise<string> {
+  const { data } = await supabase().auth.getSession();
+  if (!data.session) return "You're not signed in.";
+  try {
+    const res = await fetch("/api/notify", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${data.session.access_token}` }, body: JSON.stringify({ type: "test" }) });
+    const r = (await res.json()) as { sent?: number; why?: string };
+    return r.sent ? "Sent. It should arrive within a few seconds." : r.why || "Nothing was sent.";
+  } catch { return "Couldn't reach the server. Try again."; }
 }
 
 /** On signing out: this phone stops getting the account's notifications, and its reminders are cleared. */

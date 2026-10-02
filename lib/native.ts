@@ -7,6 +7,9 @@ export const isNative = () => typeof window !== "undefined" && Capacitor.isNativ
 /** True inside the iPhone app only (notifications are set up there first; Android follows with its own build). */
 export const isIOSApp = () => isNative() && Capacitor.getPlatform() === "ios";
 
+/** Is this part of the phone built into the app that is installed? (False in an older version of the app.) */
+export const hasPlugin = (name: string) => Capacitor.isPluginAvailable(name);
+
 /** True where Frejas runs as an app: the iPhone/Android app, or the web app saved to a home screen. */
 export const isAppLike = () => typeof window !== "undefined" && (isNative()
   || window.matchMedia?.("(display-mode: standalone)").matches

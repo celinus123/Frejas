@@ -61,6 +61,17 @@ export async function POST(req: Request) {
   if (userErr || !userData.user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const me = userData.user.id;
 
+  // "Send a test" in Settings: to your own phones, and the answer says exactly what happened
+  if (body.type === "test") {
+    const { data: own } = await admin.from("push_tokens").select("token").eq("user_id", me).eq("platform", "ios");
+    const mineTokens = ((own ?? []) as { token: string }[]).map((p) => p.token);
+    if (!apnsConfigured()) return NextResponse.json({ ok: true, sent: 0, phones: mineTokens.length, why: "The push key isn't on the server yet." });
+    if (!mineTokens.length) return NextResponse.json({ ok: true, sent: 0, phones: 0, why: "This phone isn't registered for notifications yet." });
+    const r = await sendApns(mineTokens, { title: "Frejas", body: "Notifications work. This is your test.", url: "/settings" });
+    if (r.gone.length) await admin.from("push_tokens").delete().in("token", r.gone);
+    return NextResponse.json({ ok: true, sent: r.sent, phones: mineTokens.length, why: r.sent ? "" : `Apple didn't accept it: ${r.problems.join("; ") || "unknown reason"}` });
+  }
+
   const { data: mine } = await admin.from("profiles").select("display_name").eq("id", me).maybeSingle();
   const found = await find(admin, me, (mine?.display_name as string) || "Someone", body);
   const skip = (why: string) => NextResponse.json({ ok: true, sent: 0, why });
@@ -84,12 +95,14 @@ export async function POST(req: Request) {
   // each thing is told once
   const { error: dup } = await admin.from("push_log").insert({ key: found.key, kind, to_user: found.to });
   if (dup) return skip("already told");
-  if (!apnsConfigured()) return skip("no push key yet");
+  const noted = (note: string, sent = 0) => admin.from("push_log").update({ sent, note }).eq("key", found.key).then(() => {}, () => {});
+  if (!apnsConfigured()) { await noted("no push key on the server"); return skip("no push key yet"); }
 
   const { data: phones } = await admin.from("push_tokens").select("token").eq("user_id", found.to).eq("platform", "ios");
   const tokens = ((phones ?? []) as { token: string }[]).map((p) => p.token);
-  const { sent, gone } = await sendApns(tokens, found.note);
+  if (!tokens.length) { await noted("no phone registered"); return skip("no phone"); }
+  const { sent, gone, problems } = await sendApns(tokens, found.note);
   if (gone.length) await admin.from("push_tokens").delete().in("token", gone);
-  await admin.from("push_log").update({ sent }).eq("key", found.key);
+  await noted(problems.length ? `apple: ${problems.join("; ")}` : "sent", sent);
   return NextResponse.json({ ok: true, sent });
 }
