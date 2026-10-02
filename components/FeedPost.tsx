@@ -99,7 +99,7 @@ export function PostCard({ post, uid, who, photo, social, pickerOpen, setPicker,
     <article className="post card">
       <div className="post-photo">
         <button onClick={onOpen} aria-label={`Open ${ci!.title}`} style={{ position: "absolute", inset: 0, border: 0, padding: 0, background: "none" }}>
-          {photo && <img src={photo} alt={ci!.title} />}
+          {photo && <img className="post-img" src={photo} alt={ci!.title} />}
         </button>
         {D.card.whoOnPhoto && whoRow(true)}
         {bubble(true)}
@@ -226,7 +226,7 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
   return (
     <Sheet open onClose={onClose} label="Post" bare>
       {ci?.photo_path ? (
-        <div className="post-photo" style={{ flexShrink: 0 }}>{photo && <img src={photo} alt={ci.title} />}{head(true)}</div>
+        <div className="post-photo" style={{ flexShrink: 0 }}>{photo && <img className="post-img" src={photo} alt={ci.title} />}{head(true)}</div>
       ) : head(false)}
       <div style={{ padding: "14px 18px 6px", display: "flex", flexDirection: "column", gap: 10 }}>
         {ci ? (
