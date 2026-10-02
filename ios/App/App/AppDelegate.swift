@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -52,16 +53,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-/// The screen that hosts the web view. It hides the scroll line and lets the page bounce softly at the top and
-/// bottom, the way it does in Safari. (Capacitor switches the bounce off unless it is switched back on here.)
-/// The rest of how scrolling feels is left to the system.
+/// The screen that hosts the web view. It hides the scroll line, lets the page bounce softly at the top and
+/// bottom the way it does in Safari, and keeps the space that shows behind the page during a bounce in the
+/// page's own colour (white, dark or raspberry). The rest of how scrolling feels is left to the system.
 class MainViewController: CAPBridgeViewController {
+    private let pageColourKey = "underPageBackgroundColor"
+
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
-        guard let scroll = webView?.scrollView else { return }
+        guard let web = webView else { return }
+        let scroll = web.scrollView
         scroll.showsVerticalScrollIndicator = false
         scroll.showsHorizontalScrollIndicator = false
+        // Capacitor switches the bounce off; switch it back on.
         scroll.bounces = true
         scroll.alwaysBounceVertical = true
+        // Capacitor paints the space behind the page in the fixed colour from capacitor.config (white).
+        // Hand that back to the web view, which then uses the page's background colour...
+        scroll.backgroundColor = nil
+        // ...and keep the web view's own background in step with the page as well, for the moments it shows through.
+        web.addObserver(self, forKeyPath: pageColourKey, options: [.new], context: nil)
+    }
+
+    override func observeValue(forKeyPath keyPath: String?, of object: Any?,
+                               change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
+        guard keyPath == pageColourKey, let web = object as? WKWebView else {
+            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
+            return
+        }
+        if let colour = web.underPageBackgroundColor, web.backgroundColor != colour {
+            web.backgroundColor = colour
+        }
     }
 }
