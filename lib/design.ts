@@ -18,7 +18,7 @@ export const D = {
   },
   icon: { action: 15, inline: 12, nav: 23 },
   emoji: { pick: 15, pickGap: 4, pickPad: 6, sum: 10, sumGap: -0.5 },
-  avatar: { post: 22, comment: 15, friend: 40 },
+  avatar: { post: 38, comment: 15, friend: 40 },   // post: the same on check-ins, habit cards and update tiles
   bubble: { pad: 3.5, maxWidth: 60, dark: 0.4, x: 8, y: 7, lines: 2, showName: false },
   card: { radius: 19, pad: 13, rowGap: 5, colGap: 11, ratio: "1 / 1", pickerX: 2, pickerY: 7, whoOnPhoto: true },
 } as const;

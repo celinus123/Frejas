@@ -157,8 +157,8 @@ export function Tile({ card }: { card: FunCard }) {
     case "leading":
       return (
         <Link href={`/challenges/${card.challenge.id}`} className="post soft" style={pad}>
-          <div style={{ position: "relative", width: 38 }}>
-            <Avatar name={card.who.name} path={card.who.path} size={38} />
+          <div style={{ position: "relative", width: D.avatar.post }}>
+            <Avatar name={card.who.name} path={card.who.path} size={D.avatar.post} />
             <span style={{ position: "absolute", right: -5, bottom: -4, width: 20, height: 20, borderRadius: "50%", background: "var(--surface)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="trophy" size={D.icon.inline} color="var(--accent)" /></span>
           </div>
           <div className="t-text"><b>{card.who.you ? "You're" : `${card.who.name} is`}</b> leading</div>
