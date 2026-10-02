@@ -8,6 +8,7 @@ export interface Profile {
   week_starts_monday: boolean;
   new_habits_private: boolean;
   friend_code: string;
+  notify_off?: string[];   // kinds of notification switched off (database change 016)
   created_at: string;
 }
 

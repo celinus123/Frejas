@@ -8,6 +8,7 @@ import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { uploadAvatar } from "@/lib/photos";
 import { myBlocks, unblockUser, type Blocked } from "@/lib/safety";
+import { NOTE_KINDS, enablePush, forgetPush, pushState, type PushState } from "@/lib/push";
 import type { Profile } from "@/lib/types";
 
 export default function Settings() {
@@ -21,6 +22,8 @@ export default function Settings() {
   const [blocks, setBlocks] = useState<Blocked[]>([]);
   const [blocksOpen, setBlocksOpen] = useState(false);
   useEffect(() => { if (userId) myBlocks().then(setBlocks); }, [userId]);
+  const [push, setPush] = useState<PushState | null>(null);
+  useEffect(() => { pushState().then(setPush); }, []);
   if (!profile || !userId || !session) return null;
   const email = session.user.email ?? "";
 
@@ -59,7 +62,7 @@ export default function Settings() {
     toast({ text: <><b>{b.display_name || "They"}</b> can reach you again. You&apos;re not friends until one of you adds the other.</> });
   }
 
-  async function logout() { await supabase().auth.signOut(); router.replace("/welcome"); }
+  async function logout() { await forgetPush(); await supabase().auth.signOut(); router.replace("/welcome"); }
 
   async function deleteAccount() {
     setBusy(true);
@@ -96,6 +99,20 @@ export default function Settings() {
 
       <div className="label">Appearance</div>
       <div className="card group"><div className="row"><Icon name="moon" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Theme</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Auto follows your phone</div></div>{seg}</div></div>
+
+      <div className="label">Notifications</div>
+      <div className="card group">
+        {push === "prompt" && (
+          <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={async () => setPush(await enablePush())}>
+            <Icon name="bell" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Turn on notifications</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Your phone asks once. You choose below what you hear about.</div></div><Icon name="right" size={16} color="var(--ink-2)" /></button>
+        )}
+        {push === "denied" && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Notifications are off</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Turn them on for Frejas in your iPhone&apos;s Settings.</div></div></div>}
+        {NOTE_KINDS.map(([id, label]) => {
+          const off = profile.notify_off ?? [];
+          return <div key={id} className="row"><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>{label}</div><Switch on={!off.includes(id)} onChange={(v) => update({ notify_off: v ? off.filter((x) => x !== id) : [...off, id] })} label={label} /></div>;
+        })}
+      </div>
+      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", lineHeight: 1.45 }}>{push === "unavailable" ? "Notifications arrive in the iPhone app. " : ""}Reminders are set on each habit and challenge.</div>
 
       <div className="label">Privacy</div>
       <div className="card group">

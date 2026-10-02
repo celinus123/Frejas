@@ -16,6 +16,8 @@ import { StakeLine } from "@/components/Stake";
 import { MembersIn } from "@/components/MembersIn";
 import { SafetySheet } from "@/components/Safety";
 import type { SafetyTarget } from "@/lib/safety";
+import { ReminderField } from "@/components/ReminderField";
+import { enablePush, hhmm, notify, syncReminders } from "@/lib/push";
 import { addComment, react, removeComment, summary, type Social } from "@/lib/social";
 import { D, type Emoji } from "@/lib/design";
 import { signedUrls } from "@/lib/photos";
@@ -69,6 +71,9 @@ function ChallengePage({ id }: { id: string }) {
   const [newFindable, setNewFindable] = useState(false);
   const [newMax, setNewMax] = useState<number | null>(null);
   const [safety, setSafety] = useState<SafetyTarget | null>(null);   // report or block
+  const [remind, setRemind] = useState("");              // the reminder on the habit that counts here ("07:30" or "")
+  const [remindOpen, setRemindOpen] = useState(false);
+  const [newRemind, setNewRemind] = useState("");
   const t = today();
 
   const load = useCallback(async () => {
@@ -105,8 +110,9 @@ function ChallengePage({ id }: { id: string }) {
     (async () => {
       const hid = me.habit_id ?? (await ensureHabit(c, me, userId));
       if (hid) {
-        const { data: h } = await supabase().from("habits").select("name").eq("id", hid).maybeSingle();
+        const { data: h } = await supabase().from("habits").select("name, reminder_time").eq("id", hid).maybeSingle();
         setHabitName((h as { name: string } | null)?.name);
+        setRemind(hhmm((h as { reminder_time: string | null } | null)?.reminder_time));
         if (!me.habit_id) load();
       }
     })();
@@ -200,6 +206,16 @@ function ChallengePage({ id }: { id: string }) {
     setJoinOpen(false);
     toast({ text: newJoinBy ? <>Friends can join until <b>{formatShort(newJoinBy)}</b>.</> : "Friends can join for as long as it runs." });
     load();
+  }
+  async function saveRemind() {
+    if (!me!.habit_id) return;
+    if (newRemind) await enablePush();
+    const { error } = await supabase().from("habits").update({ reminder_time: newRemind || null }).eq("id", me!.habit_id);
+    if (error) { toast({ text: error.message }); return; }
+    setRemind(newRemind); setRemindOpen(false);
+    toast({ text: newRemind ? <>You&apos;ll be reminded at <b>{newRemind}</b>.</> : "Reminder removed." });
+    const { data: hs } = await supabase().from("habits").select("id, name, frequency, days, reminder_time, archived_at").eq("owner_id", userId!);
+    syncReminders((hs ?? []) as Parameters<typeof syncReminders>[0]);
   }
   async function leave() {
     if (!confirm(`Leave ${c!.name}? Your check-ins stay in the group's history.`)) return;
@@ -538,6 +554,15 @@ function ChallengePage({ id }: { id: string }) {
           </div>
           <button className="btn btn-primary" onClick={saveWho}><Icon name="check" stroke={2.4} />Save</button>
         </Sheet>
+        <Sheet open={remindOpen} onClose={() => setRemindOpen(false)} label="Reminder">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="h1" style={{ fontSize: 22 }}>Reminder</div>
+            <button className="icon-btn" aria-label="Close" onClick={() => setRemindOpen(false)}><Icon name="x" /></button>
+          </div>
+          <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>A nudge from your own phone at the time you choose. Only you get it.</p>
+          <ReminderField value={newRemind} onChange={setNewRemind} when={c!.frequency === "specific_days" ? "On the challenge's days" : "Every day"} />
+          <button className="btn btn-primary" onClick={saveRemind}><Icon name="check" stroke={2.4} />Save</button>
+        </Sheet>
         <Sheet open={joinOpen} onClose={() => setJoinOpen(false)} label="Last day to join">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div className="h1" style={{ fontSize: 22 }}>Last day to join</div>
@@ -571,6 +596,8 @@ function ChallengePage({ id }: { id: string }) {
             )}
             {group && isCreator && data!.members.length === 1 && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={toSolo}>
               <Icon name="user" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Make it just me again</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Nobody has joined yet. Invitations you sent are withdrawn.</div></div></button>}
+            {!finished && me!.habit_id && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewRemind(remind); setMenu(false); setRemindOpen(true); }}>
+              <Icon name="clock" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Reminder</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{remind ? `At ${remind}` : "None"}</div></div></button>}
             {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
             {isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewStart(c!.starts_on); setMenu(false); setStartOpen(true); }}>
               <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
@@ -841,7 +868,7 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink, beforeInv
   async function invite(uid: string) {
     await beforeInvite?.();
     const { error } = await supabase().from("challenge_invites").insert({ challenge_id: c.id, user_id: uid, invited_by: userId });
-    if (!error) { setSent((s) => new Set(s).add(uid)); toast({ text: "Invitation sent." }); }
+    if (!error) { setSent((s) => new Set(s).add(uid)); toast({ text: "Invitation sent." }); notify({ type: "invite", challenge_id: c.id, user_id: uid }); }
   }
   return (
     <Sheet open={open} onClose={onClose} label="Invite friends">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { FrejasLockup } from "@/components/Logo";
+import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 
 export default function AddFriend({ params }: { params: Promise<{ code: string }> }) {
@@ -24,8 +25,9 @@ export default function AddFriend({ params }: { params: Promise<{ code: string }
     if (!session || !profile?.display_name || !name || state !== "idle") return;
     if (profile.friend_code === code) { setState("error"); setErr("This is your own friend link. Share it with someone else."); return; }
     setState("adding");
-    supabase().rpc("add_friend", { p_code: code }).then(({ error }) => {
+    supabase().rpc("add_friend", { p_code: code }).then(({ data, error }) => {
       if (error) { setState("error"); setErr(error.message); return; }
+      if (typeof data === "string") notify({ type: "friend", user_id: data });   // the one who shared the link hears about it
       setState("done");
       toast({ text: <>You and <b>{name}</b> are now friends.</> });
       router.replace("/feed");

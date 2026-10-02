@@ -84,3 +84,14 @@ updates the apps too. Only changes to the shell itself (icons, permissions, new 
   Create that user in Supabase → Authentication → Users → Add user, with "Auto confirm" on.
 
 After changing native settings or adding a plugin: `npx cap sync`.
+
+### Notifications
+
+- From other people (invitation, request to join, comment, new friend): the app calls `/api/notify`, which looks the event up in
+  the database and sends to Apple (`lib/server/apns.ts`). It needs three settings in Vercel, entered by hand and never shared:
+  `APNS_KEY` (the text of the .p8 key from Apple Developer → Keys, with "Apple Push Notifications service" ticked),
+  `APNS_KEY_ID` (shown next to the key) and `APNS_TEAM_ID` (Apple Developer → Membership). Without them nothing is sent.
+- The app id `app.frejas` needs the Push Notifications capability (Apple Developer → Identifiers), and the provisioning profile
+  has to be made again afterwards, or the build is refused.
+- Reminders are set on the phone itself from each habit's reminder time (`lib/push.ts`, `syncReminders`). No server involved.
+- Android needs Firebase and its own build; `lib/push.ts` is switched on for the iPhone app only until then.

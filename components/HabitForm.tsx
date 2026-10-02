@@ -10,6 +10,8 @@ import { Avatar, Switch } from "./ui";
 import { MAX_CATEGORIES, SUGGESTED_CATEGORIES, categoriesOf } from "./CategoryFilter";
 import { habitViewers, loadHabits, myFriends, pairHabits, setHabitViewers, unpairHabit, type Friend } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
+import { ReminderField } from "./ReminderField";
+import { enablePush, hhmm } from "@/lib/push";
 
 const FREQS: { v: Frequency; l: string }[] = [
   { v: "daily", l: "Daily" }, { v: "specific_days", l: "Specific days" }, { v: "times_per_week", l: "Times a week" },
@@ -27,6 +29,7 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [days, setDays] = useState<number[]>(habit?.days ?? [1, 3, 5]);
   const [times, setTimes] = useState(habit?.times_per_week ?? 3);
   const [category, setCategory] = useState<string | null>(habit?.category ?? null);
+  const [remind, setRemind] = useState(hhmm(habit?.reminder_time));   // "07:30", or "" for none
   // who can see it: only you, all your friends, or the friends you pick
   const [audience, setAudience] = useState<"private" | "friends" | "chosen">(habit ? (habit.visibility === "friends" ? "friends" : "private") : (profile?.new_habits_private ?? true) ? "private" : "friends");
   const [viewers, setViewers] = useState<Set<string>>(new Set());
@@ -94,11 +97,12 @@ export function HabitForm({ habit }: { habit?: Habit }) {
     if (audience === "chosen" && viewers.size === 0) { setErr("Pick at least one friend, or choose Only me."); return; }
     const seenBy = audience === "chosen" ? [...viewers] : [];
     setBusy(true); setErr(null);
+    if (remind) await enablePush();   // in the iPhone app: the phone asks once whether Frejas may send notifications
     const row = {
       name: name.trim(), frequency: freq,
       days: freq === "specific_days" ? [...days].sort() : null,
       times_per_week: freq === "times_per_week" ? times : null,
-      category, visibility: audience === "friends" ? "friends" : "private",
+      category, visibility: audience === "friends" ? "friends" : "private", reminder_time: remind || null,
       ...(habit ? (start !== habitStart(habit) ? { starts_on: start } : {}) : { starts_on: start < t ? start : null }),
     };
     if (habit) {
@@ -256,6 +260,9 @@ export function HabitForm({ habit }: { habit?: Habit }) {
       {catErr ? <div role="alert" className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px", color: "var(--ink)" }}>{catErr}</div>
         : used.length >= MAX_CATEGORIES - 3 && <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>{used.length} of {MAX_CATEGORIES} categories used.</div>}
 
+      <div className="label">Reminder <span style={{ fontWeight: 600 }}>· optional</span></div>
+      <ReminderField value={remind} onChange={setRemind} when={freq === "specific_days" && days.length ? "On the days you picked" : "Every day"} />
+
       <div className="label">Who can see it</div>
       <div className="card group" role="radiogroup" aria-label="Who can see it">
         {([["private", "lock", "Only me", "Nobody else sees it"],
@@ -291,7 +298,6 @@ export function HabitForm({ habit }: { habit?: Habit }) {
           </div>
         </>
       )}
-      <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "0 4px" }}>Reminders are coming in a later version.</div>
 
       {habit && (
         <div className="card group" style={{ marginTop: 10 }}>

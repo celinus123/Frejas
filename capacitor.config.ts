@@ -17,6 +17,8 @@ const config: CapacitorConfig = {
   ios: { contentInset: "never" },
   android: { allowMixedContent: false },
   plugins: {
+    // a notification that arrives while the app is open is shown like any other
+    PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
     SplashScreen: { launchShowDuration: 700, launchAutoHide: true, backgroundColor: "#ffffff", showSpinner: false },
   },
 };

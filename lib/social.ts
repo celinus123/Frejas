@@ -2,6 +2,7 @@
 import { supabase } from "./supabase";
 import type { Emoji } from "./design";
 import { emojiSupported } from "./data";
+import { notify } from "./push";
 
 /** A post in the feed is either a check-in, or someone's shared habits for one day. */
 export type PostRef = { kind: "checkin"; id: string } | { kind: "day"; owner: string; day: string };
@@ -59,6 +60,7 @@ export async function addComment(ref: PostRef, uid: string, body: string): Promi
     : sb().from("day_comments").insert({ owner_id: ref.owner, day: ref.day, user_id: uid, body: text });
   const { data, error } = await q.select("id, user_id, body, created_at").single();
   if (error) throw error;
+  notify({ type: "comment", on: ref.kind === "checkin" ? "checkin" : "day", id: (data as PostComment).id });
   return data as PostComment;
 }
 

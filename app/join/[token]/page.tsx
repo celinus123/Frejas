@@ -9,6 +9,7 @@ import { Icon } from "@/components/Icon";
 import { StakeLine } from "@/components/Stake";
 import { MembersIn } from "@/components/MembersIn";
 import { forgetInvite, saveInvite } from "@/lib/savedInvites";
+import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import { formatShort, today } from "@/lib/dates";
 import { invitePreview, loadHabits, type InvitePreview } from "@/lib/data";
@@ -92,7 +93,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
         throw error;
       }
       forgetInvite(token);
-      if (data === "requested") { setRequested(true); setBusy(false); return; }
+      if (data === "requested") { notify({ type: "request", challenge_id: inv.challenge_id }); setRequested(true); setBusy(false); return; }
       router.replace(`/challenges/${inv.challenge_id}`);
     } catch (e) {
       setErr((e as Error).message); setBusy(false);

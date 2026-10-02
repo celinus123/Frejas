@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
+import { syncReminders } from "@/lib/push";
 import { Icon } from "@/components/Icon";
 import { DayCircle, Ring } from "@/components/Ring";
 import { Avatars, Empty, Sheet } from "@/components/ui";
@@ -55,6 +56,7 @@ export function Today() {
     if (!userId) return;
     const [h, l, mc] = await Promise.all([loadHabits(userId), loadLogs(userId, from, t), myChallenges(userId)]);
     setHabits(h); setLogs(l); setMine(mc);
+    syncReminders(h);   // in the iPhone app: the phone's reminders follow your habits
     const active = mc.filter((x) => isActive(x.challenge));
     const full = await Promise.all(active.map(async (x) => {
       const d = await loadChallenge(x.challenge.id);

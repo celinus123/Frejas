@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import type { Profile } from "@/lib/types";
+import { startPush } from "@/lib/push";
 
 interface Toast { text: ReactNode; action?: { label: string; onClick: () => void }; undo?: () => void }
 interface Ctx {
@@ -56,6 +57,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [uidNow]);
   const looksAfter = useRef(false);
   looksAfter.current = reportsOpen !== null;
+  // in the iPhone app: keep this phone known for notifications, and open the right page when one is tapped
+  useEffect(() => { if (uidNow) startPush((url) => router.push(url)); }, [uidNow, router]);
   // asked when the app opens; whoever looks after reports is also asked each time the app comes back to the front
   useEffect(() => {
     refreshReports();
