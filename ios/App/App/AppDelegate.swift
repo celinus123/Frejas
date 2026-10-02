@@ -52,14 +52,16 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-/// The screen that hosts the web view. It only hides the scroll line.
-/// How scrolling feels is left to the system: setting the deceleration rate here (build 1.0 (2)) made it
-/// noticeably less smooth than the same page in Safari.
+/// The screen that hosts the web view. It hides the scroll line and lets the page bounce softly at the top and
+/// bottom, the way it does in Safari. (Capacitor switches the bounce off unless it is switched back on here.)
+/// The rest of how scrolling feels is left to the system.
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         guard let scroll = webView?.scrollView else { return }
         scroll.showsVerticalScrollIndicator = false
         scroll.showsHorizontalScrollIndicator = false
+        scroll.bounces = true
+        scroll.alwaysBounceVertical = true
     }
 }
