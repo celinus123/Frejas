@@ -6,6 +6,9 @@ import { nativeShare } from "./native";
 
 const sb = () => supabase();
 
+// check_ins reaches profiles two ways (the author, and everyone who reacted), so the author link has to be named.
+const CHECKIN_SELECT = "*, profiles!check_ins_user_id_fkey(display_name, avatar_path), reactions(user_id)";
+
 export async function loadHabits(uid: string, includeArchived = false): Promise<Habit[]> {
   let q = sb().from("habits").select("*").eq("owner_id", uid).order("created_at");
   if (!includeArchived) q = q.is("archived_at", null);
@@ -118,14 +121,16 @@ export async function loadChallenge(id: string) {
   const [c, m, ci] = await Promise.all([
     sb().from("challenges").select("*").eq("id", id).maybeSingle(),
     sb().from("challenge_members").select("*, profiles(display_name, avatar_path)").eq("challenge_id", id).order("joined_at"),
-    sb().from("check_ins").select("*, profiles(display_name, avatar_path), reactions(user_id)").eq("challenge_id", id).order("created_at", { ascending: false }),
+    sb().from("check_ins").select(CHECKIN_SELECT).eq("challenge_id", id).order("created_at", { ascending: false }),
   ]);
   if (c.error) throw c.error;
+  if (m.error) throw m.error;
+  if (ci.error) throw ci.error;
   return { challenge: c.data as Challenge | null, members: (m.data ?? []) as Member[], checkins: (ci.data ?? []) as CheckIn[] };
 }
 
 export async function loadFeed(limit = 60): Promise<CheckIn[]> {
-  const { data, error } = await sb().from("check_ins").select("*, profiles(display_name, avatar_path), reactions(user_id)")
+  const { data, error } = await sb().from("check_ins").select(CHECKIN_SELECT)
     .order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return data as CheckIn[];
