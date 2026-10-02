@@ -198,13 +198,13 @@ export default function Stats() {
 
       {best.length > 0 && rates.length > 1 && (
         <>
-          <h2 className="h2" style={{ marginTop: 6 }}>Going best</h2>
+          <h2 className="h2" style={{ marginTop: 6 }}>Your strongest habits</h2>
           <section className="card group">{best.map((r, i) => rateRow(r, i))}</section>
         </>
       )}
       {behind.length > 0 && (
         <>
-          <h2 className="h2" style={{ marginTop: 6 }}>Worth catching up on</h2>
+          <h2 className="h2" style={{ marginTop: 6 }}>Needs a little love</h2>
           <section className="card group">{behind.map((r) => rateRow(r))}</section>
         </>
       )}

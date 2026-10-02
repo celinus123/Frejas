@@ -14,6 +14,8 @@ import { MAX_CHOICES, daysLeft, fmt, isV2, joinByLabel, joinClosed, ordinal, sch
 import { PostSheet, type Who } from "@/components/FeedPost";
 import { StakeLine } from "@/components/Stake";
 import { MembersIn } from "@/components/MembersIn";
+import { SafetySheet } from "@/components/Safety";
+import type { SafetyTarget } from "@/lib/safety";
 import { addComment, react, removeComment, summary, type Social } from "@/lib/social";
 import { D, type Emoji } from "@/lib/design";
 import { signedUrls } from "@/lib/photos";
@@ -65,7 +67,8 @@ function ChallengePage({ id }: { id: string }) {
   const [newJoinBy, setNewJoinBy] = useState<string | null>(null);
   const [whoOpen, setWhoOpen] = useState(false);        // the "who can join" sheet
   const [newFindable, setNewFindable] = useState(false);
-  const [newMax, setNewMax] = useState<number | null>(null);   // the check-in that is opened (photo, reactions, comments)
+  const [newMax, setNewMax] = useState<number | null>(null);
+  const [safety, setSafety] = useState<SafetyTarget | null>(null);   // report or block
   const t = today();
 
   const load = useCallback(async () => {
@@ -131,6 +134,7 @@ function ChallengePage({ id }: { id: string }) {
   const mine = st[myIdx];
   const url = inviteUrl(c.invite_token);
   const myCheckins = data.checkins.filter((x) => x.user_id === userId);
+  const shown = data.checkins.filter((x) => !x.hidden);   // without the ones from someone there is a block with (they only count on the leaderboard)
   const weeks = isV2(c) ? weekResults(c, me, myCheckins) : [];
   const curIdx = weeks.findIndex((w) => w.isCurrent);
   const wi = weekIdx !== null && weeks[weekIdx] && !weeks[weekIdx].isFuture ? weekIdx : curIdx >= 0 ? curIdx : weeks.length - 1;
@@ -448,13 +452,13 @@ function ChallengePage({ id }: { id: string }) {
           {progressCard}
           {!finished && weekCard}
           <h2 className="h2" style={{ marginTop: 14 }}>Latest</h2>
-          {data.checkins.length === 0 && <div className="muted" style={{ fontSize: 14, padding: "0 4px" }}>No check-ins yet. Be the first!</div>}
-          {latest(data.checkins)}
+          {shown.length === 0 && <div className="muted" style={{ fontSize: 14, padding: "0 4px" }}>No check-ins yet. Be the first!</div>}
+          {latest(shown)}
         </>
       )}
       {shownTab === "Leaderboard" && <Leaderboard c={c} st={st} userId={userId!} finished={finished} />}
       {shownTab === "Stats" && <GroupStats c={c} st={st} checkins={data.checkins} userId={userId!} />}
-      {shownTab === "Chat" && <Chat c={c} userId={userId!} members={data.members} />}
+      {shownTab === "Chat" && <Chat c={c} userId={userId!} members={data.members} onMore={setSafety} />}
       {sheets()}
     </main>
   );
@@ -472,9 +476,11 @@ function ChallengePage({ id }: { id: string }) {
           return ci && userId ? (
             <PostSheet post={{ key: `c:${ci.id}`, ref: { kind: "checkin", id: ci.id }, at: ci.created_at, authorId: ci.user_id, ci, challenge: c! }} uid={userId} who={who}
               photo={ci.photo_path ? photos[ci.photo_path] : undefined} social={socialOf(ci)} onClose={() => setOpenCi(null)}
-              onReact={(e) => onReact(ci, e)} onComment={(body) => onComment(ci, body)} onDelete={(cid) => onDeleteComment(ci, cid)} />
+              onReact={(e) => onReact(ci, e)} onComment={(body) => onComment(ci, body)} onDelete={(cid) => onDeleteComment(ci, cid)}
+              onMore={(x) => { setOpenCi(null); setSafety(x); }} />
           ) : null;
         })()}
+        <SafetySheet target={safety} onClose={() => setSafety(null)} onBlocked={() => { setTab("Overview"); load().catch(() => {}); }} />
         <Sheet open={shareOpen} onClose={() => setShareOpen(false)} label="Invite friends">
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center", paddingTop: 6 }}>
             {params.get("created") === "1" && <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--primary)", color: "var(--on-primary)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="check" size={36} stroke={2.4} /></div>}
@@ -753,7 +759,7 @@ function GroupStats({ c, st, checkins, userId }: { c: Challenge; st: Standing[];
 }
 
 // ---------------------------------------------------------------- chat
-function Chat({ c, userId, members }: { c: Challenge; userId: string; members: Member[] }) {
+function Chat({ c, userId, members, onMore }: { c: Challenge; userId: string; members: Member[]; onMore: (t: SafetyTarget) => void }) {
   const [msgs, setMsgs] = useState<Message[] | null>(null);
   const [text, setText] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -798,7 +804,9 @@ function Chat({ c, userId, members }: { c: Challenge; userId: string; members: M
               <Avatar name={p?.display_name ?? "?"} path={p?.avatar_path} size={28} />
               <div>
                 {showName && <div className="muted" style={{ fontSize: 11.5, margin: "0 0 3px 10px" }}>{p?.display_name ?? "Former member"} · {time}</div>}
-                <div className="card" style={{ padding: "10px 14px", borderRadius: "18px 18px 18px 6px", fontSize: 14, lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.body}</div>
+                {/* a tap on someone else's message opens report or block */}
+                <button className="card" onClick={() => onMore({ user: m.user_id, name: p?.display_name ?? "Former member", kind: "message", id: m.id })} aria-label={`${m.body}. Report or block`}
+                  style={{ display: "block", border: 0, color: "inherit", textAlign: "left", padding: "10px 14px", borderRadius: "18px 18px 18px 6px", fontSize: 14, lineHeight: 1.4, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{m.body}</button>
               </div>
             </div>
           );

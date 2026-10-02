@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
-import { Avatar, BackBar, Switch } from "@/components/ui";
+import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { uploadAvatar } from "@/lib/photos";
+import { myBlocks, unblockUser, type Blocked } from "@/lib/safety";
 import type { Profile } from "@/lib/types";
 
 export default function Settings() {
@@ -17,6 +18,9 @@ export default function Settings() {
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [blocks, setBlocks] = useState<Blocked[]>([]);
+  const [blocksOpen, setBlocksOpen] = useState(false);
+  useEffect(() => { if (userId) myBlocks().then(setBlocks); }, [userId]);
   if (!profile || !userId || !session) return null;
   const email = session.user.email ?? "";
 
@@ -41,6 +45,12 @@ export default function Settings() {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob); a.download = "frejas-my-data.json"; a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  async function unblock(b: Blocked) {
+    try { await unblockUser(userId!, b.id); } catch (e) { toast({ text: (e as Error).message }); return; }
+    setBlocks((all) => all.filter((x) => x.id !== b.id));
+    toast({ text: <><b>{b.display_name || "They"}</b> can reach you again. You&apos;re not friends until one of you adds the other.</> });
   }
 
   async function logout() { await supabase().auth.signOut(); router.replace("/welcome"); }
@@ -87,12 +97,15 @@ export default function Settings() {
           <Switch on={profile.new_habits_private} onChange={(v) => update({ new_habits_private: v })} label="New habits are private" /></div>
         <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={exportData}>
           <Icon name="download" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Download my data</div></button>
+        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setBlocksOpen(true)}>
+          <Icon name="block" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Blocked people</div><span className="muted" style={{ fontSize: "var(--t-sub)", fontWeight: 700 }}>{blocks.length || "None"}</span><Icon name="right" size={16} color="var(--ink-2)" /></button>
       </div>
 
       <div className="label">About</div>
       <div className="card group">
         <Link href="/privacy" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="shield" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Privacy policy</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
         <Link href="/terms" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="edit" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Terms</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+        <a href="mailto:hello@frejas.app" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="mail" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Contact us</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>hello@frejas.app</div></div><Icon name="right" size={16} color="var(--ink-2)" /></a>
       </div>
 
       <div className="card group" style={{ marginTop: 8 }}>
@@ -111,6 +124,25 @@ export default function Settings() {
         </section>
       )}
       <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1</div>
+
+      <Sheet open={blocksOpen} onClose={() => setBlocksOpen(false)} label="Blocked people">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div className="h1" style={{ fontSize: 22 }}>Blocked people</div>
+          <button className="icon-btn" aria-label="Close" onClick={() => setBlocksOpen(false)}><Icon name="x" /></button>
+        </div>
+        {blocks.length ? (
+          <div className="card group">
+            {blocks.map((b) => (
+              <div key={b.id} className="row">
+                <Avatar name={b.display_name} size={38} />
+                <div style={{ flex: 1, minWidth: 0, fontSize: "var(--t-title)", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.display_name || "Someone"}</div>
+                <button className="btn btn-soft btn-sm" onClick={() => unblock(b)}>Unblock</button>
+              </div>
+            ))}
+          </div>
+        ) : <div className="muted" style={{ fontSize: 14, lineHeight: 1.5 }}>Nobody. To block someone, tap their picture in the Feed, or the three dots on something they posted.</div>}
+        <p className="muted" style={{ margin: 0, fontSize: "var(--t-sub)", lineHeight: 1.45 }}>People you block aren&apos;t told. You stop seeing each other&apos;s posts, comments and messages.</p>
+      </Sheet>
     </main>
   );
 }

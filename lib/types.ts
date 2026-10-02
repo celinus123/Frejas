@@ -102,4 +102,6 @@ export interface CheckIn {
   profiles?: { display_name: string; avatar_path: string | null } | null;
   reactions?: { user_id: string; emoji?: string }[];
   comments?: { id: string; user_id: string; body: string; created_at: string }[];
+  hidden?: boolean;     // from someone there is a block with: it counts on the leaderboard and is shown nowhere (database change 014)
+  had_photo?: boolean;
 }

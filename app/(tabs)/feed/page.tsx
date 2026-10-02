@@ -6,6 +6,8 @@ import { Icon } from "@/components/Icon";
 import { Avatar, Empty, Sheet } from "@/components/ui";
 import { PostCard, PostSheet, Tile, type FeedPost, type Who } from "@/components/FeedPost";
 import { PageHead } from "@/components/PageHead";
+import { SafetySheet } from "@/components/Safety";
+import { blockedIds, type SafetyTarget } from "@/lib/safety";
 import { supabase } from "@/lib/supabase";
 import { friendUrl, habitsWithViewers, loadChallenge, loadFeed, loadHabits, myChallenges, myFriends, removeFriend, shareLink, type Friend, type MyChallenge } from "@/lib/data";
 import { challengeCards, friendDayCards, goalCards, recapCards, type FunCard, type Who as CardWho } from "@/lib/feedCards";
@@ -34,16 +36,17 @@ export default function Feed() {
   const [openKey, setOpenKey] = useState<string | null>(null); // the post that is opened
   const [addOpen, setAddOpen] = useState(false);
   const [friendSheet, setFriendSheet] = useState<Friend | null>(null);
+  const [safety, setSafety] = useState<SafetyTarget | null>(null);   // report or block
   const t = today();
 
   const load = useCallback(async () => {
     if (!userId) return;
     const d = parse(t);
     const since = iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)) < addDays(t, -40) ? iso(new Date(d.getFullYear(), d.getMonth() - 1, 1)) : addDays(t, -40);
-    const [f, c, fr, mh, ml, ds] = await Promise.all([
+    const [f, c, fr, mh, ml, ds, blocked] = await Promise.all([
       loadFeed(80), myChallenges(userId), myFriends(userId), loadHabits(userId),
       supabase().from("habit_logs").select("habit_id, log_date, created_at").eq("user_id", userId).gte("log_date", since),
-      loadDaySocial(addDays(t, -7)),
+      loadDaySocial(addDays(t, -7)), blockedIds(),
     ]);
     setChs(c); setFriends(fr);
     signedUrls("photos", f.map((x) => x.photo_path)).then(setPhotos).catch(() => {});
@@ -93,7 +96,8 @@ export default function Feed() {
     setCards([
       ...recapCards(mh, myLogs),
       ...goalCards([...mh, ...fh], [...myLogs, ...fl], whoOf),
-      ...challengeCards(cd.filter((x) => x.challenge).map((x) => ({ challenge: x.challenge!, members: x.members, checkins: x.checkins })), userId),
+      // no "… is leading" news about someone there is a block with
+      ...challengeCards(cd.filter((x) => x.challenge).map((x) => ({ challenge: x.challenge!, members: x.members, checkins: x.checkins })), userId).filter((x) => !(x.kind === "leading" && blocked.has(x.who.id))),
     ]);
   }, [userId, t, profile?.avatar_path]);
   useEffect(() => { load().catch(() => setPosts((p) => p ?? [])); }, [load]);
@@ -247,14 +251,16 @@ export default function Feed() {
 
       {opened && userId && (
         <PostSheet post={opened} uid={userId} who={who} photo={opened.ci?.photo_path ? photos[opened.ci.photo_path] : undefined} social={social[opened.key] ?? noSocial}
-          onClose={() => setOpenKey(null)} onReact={(e) => onReact(opened.ref, e)} onComment={(body) => onComment(opened.ref, body)} onDelete={(id) => onDelete(opened.ref, id)} />
+          onClose={() => setOpenKey(null)} onReact={(e) => onReact(opened.ref, e)} onComment={(body) => onComment(opened.ref, body)} onDelete={(id) => onDelete(opened.ref, id)}
+          onMore={(x) => { setOpenKey(null); setSafety(x); }} />
       )}
+      <SafetySheet target={safety} onClose={() => setSafety(null)} onBlocked={() => load().catch(() => {})} />
 
       <Sheet open={addOpen} onClose={() => setAddOpen(false)} label="Add a friend">
         <div className="h1" style={{ fontSize: 24 }}>Add a friend</div>
         <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>
           Send your friend link. Whoever opens it becomes your friend, so only share it with people you know.
-          Friends see your check-ins and the habits you set to <b style={{ color: "var(--ink)" }}>Friends</b>. Private habits stay private.
+          Friends see the habits you set to <b style={{ color: "var(--ink)" }}>Friends</b>. Check-ins stay inside each challenge, and private habits stay private.
         </p>
         {profile && <div className="field" style={{ fontSize: 13.5, fontWeight: 700, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", minHeight: 46 }}>{friendUrl(profile.friend_code).replace(/^https?:\/\//, "")}</div>}
         <button className="btn btn-primary" onClick={shareFriendLink}><Icon name="share" />Share my friend link</button>
@@ -274,6 +280,7 @@ export default function Feed() {
             <Link href="/challenges/new" className="btn btn-primary" onClick={() => setFriendSheet(null)}><Icon name="trophy" />Start a challenge together</Link>
             {friendSheet.added && <button className="btn btn-soft" onClick={() => unfriend(friendSheet)}>Remove friend</button>}
             {!friendSheet.added && <p className="muted" style={{ margin: 0, fontSize: 12.5, textAlign: "center" }}>You&apos;re friends because you share a challenge.</p>}
+            <button className="btn" style={{ background: "none", color: "var(--ink-2)", height: 40 }} onClick={() => { const f = friendSheet; setFriendSheet(null); setSafety({ user: f.id, name: f.display_name, kind: "person" }); }}>Report or block</button>
           </>
         )}
       </Sheet>

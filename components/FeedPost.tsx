@@ -11,6 +11,7 @@ import type { FunCard } from "@/lib/feedCards";
 import { fmt } from "@/lib/scoring";
 import { addDays, parse, timeAgo, today } from "@/lib/dates";
 import type { Challenge, CheckIn } from "@/lib/types";
+import type { SafetyTarget } from "@/lib/safety";
 
 export interface FeedPost {
   key: string;
@@ -185,10 +186,11 @@ export function Tile({ card }: { card: FunCard }) {
 interface SheetProps {
   post: FeedPost; uid: string; who: Who; photo?: string; social: Social;
   onClose: () => void; onReact: (e: Emoji | null) => void; onComment: (body: string) => Promise<void>; onDelete: (id: string) => void;
+  onMore?: (t: SafetyTarget) => void;   // report or block: the post's author, or the writer of a comment
 }
 
 /** A post opened: the photo large, who reacted with what, the comment thread and a box to write in. */
-export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onComment, onDelete }: SheetProps) {
+export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onComment, onDelete, onMore }: SheetProps) {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -211,7 +213,12 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
     catch (e) { setErr((e as Error).message || "Couldn't post the comment. Try again."); }
     setBusy(false);
   }
-  const close = <button onClick={onClose} aria-label="Close" style={{ width: 36, height: 36, borderRadius: "50%", border: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: photo ? "rgba(30, 8, 18, 0.45)" : "var(--soft-l)", color: photo ? "#fff" : "var(--ink)", pointerEvents: "auto" }}><Icon name="x" size={18} stroke={2.2} /></button>;
+  const round = { width: 36, height: 36, borderRadius: "50%", border: 0, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: photo ? "rgba(30, 8, 18, 0.45)" : "var(--soft-l)", color: photo ? "#fff" : "var(--ink)", pointerEvents: "auto" } as const;
+  const close = <button onClick={onClose} aria-label="Close" style={round}><Icon name="x" size={18} stroke={2.2} /></button>;
+  const more = !author.you && onMore && (
+    <button aria-label="Report or block" style={round}
+      onClick={() => onMore(post.ci ? { user: post.authorId, name: author.name, kind: "check_in", id: post.ci.id } : { user: post.authorId, name: author.name, kind: "day_card", day: post.date })}><Icon name="more" size={18} /></button>
+  );
   const head = (on: boolean) => (
     <div className={on ? "who on" : "who"} style={on ? { padding: "14px 14px 30px", gap: 9 } : { gap: 9, padding: "16px 18px 0" }}>
       <Avatar name={author.name} path={author.path} size={34} />
@@ -219,7 +226,7 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
         <b className="t-title" style={{ display: "block" }}>{author.you ? "You" : author.name}</b>
         <span className="t-meta" style={{ opacity: on ? 0.85 : 1, color: on ? "inherit" : "var(--ink-2)" }}>{timeAgo(post.at)}{c ? ` · ${c.name}` : ""}</span>
       </div>
-      {close}
+      {more}{close}
     </div>
   );
 
@@ -264,6 +271,7 @@ export function PostSheet({ post, uid, who, photo, social, onClose, onReact, onC
             <div key={x.id} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
               <Avatar name={p.name} path={p.path} size={28} />
               <div className="t-text" style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}><b>{p.you ? "You" : p.name}</b> <span className="t-meta muted">{timeAgo(x.created_at)}</span><div>{x.body}</div></div>
+              {x.user_id !== uid && onMore && <button onClick={() => onMore({ user: x.user_id, name: p.name, kind: post.ref.kind === "checkin" ? "comment" : "day_comment", id: x.id })} aria-label={`Report or block: comment from ${p.name}`} className="muted" style={{ border: 0, background: "none", padding: 6, margin: -4 }}><Icon name="flag" size={D.icon.inline} stroke={2} /></button>}
               {(x.user_id === uid || post.authorId === uid) && <button onClick={() => onDelete(x.id)} aria-label="Delete comment" className="muted" style={{ border: 0, background: "none", padding: 6, margin: -4 }}><Icon name="x" size={D.icon.inline} stroke={2.2} /></button>}
             </div>
           );

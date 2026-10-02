@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import type { Challenge, CheckIn, Habit, HabitLog, Member } from "./types";
 import { iso, today } from "./dates";
 import { nativeShare } from "./native";
+import { blockedIds } from "./safety";
 
 const sb = () => supabase();
 
@@ -149,6 +150,7 @@ export async function myFriends(uid: string): Promise<Friend[]> {
     for (const p of (data ?? []) as { id: string; display_name: string; avatar_path: string | null }[]) map.set(p.id, { ...p, shared: 0, added: true });
   }
   for (const id of addedIds) { const f = map.get(id); if (f) f.added = true; }
+  for (const id of await blockedIds()) map.delete(id);   // someone you share a challenge with stays on its leaderboard, but isn't a friend
   return [...map.values()].sort((a, b) => b.shared - a.shared || a.display_name.localeCompare(b.display_name));
 }
 
@@ -173,16 +175,23 @@ export async function ensureHabit(c: Challenge, m: Member, uid: string): Promise
   return data.id as string;
 }
 
+/**
+ * A challenge with its members and check-ins. Check-ins from someone there is a block with come without
+ * title, text and photo and are marked `hidden`: they count on the leaderboard and are shown nowhere.
+ */
 export async function loadChallenge(id: string) {
-  const [c, m, ci] = await Promise.all([
+  const [c, m, ci, hid] = await Promise.all([
     sb().from("challenges").select("*").eq("id", id).maybeSingle(),
     sb().from("challenge_members").select("*, profiles(display_name, avatar_path)").eq("challenge_id", id).order("joined_at"),
     selectCheckIns((sel) => sb().from("check_ins").select(sel).eq("challenge_id", id).order("created_at", { ascending: false })),
+    blockedIds().then(async (b): Promise<{ data: unknown; error: unknown }> => (b.size ? await sb().rpc("hidden_checkins", { p_challenge: id }) : { data: [], error: null })),
   ]);
   if (c.error) throw c.error;
   if (m.error) throw m.error;
   if (ci.error) throw ci.error;
-  return { challenge: c.data as Challenge | null, members: (m.data ?? []) as Member[], checkins: (ci.data ?? []) as CheckIn[] };
+  const hidden: CheckIn[] = hid.error ? [] : ((hid.data ?? []) as { id: string; user_id: string; checkin_date: string; amount: number | null; has_photo: boolean; created_at: string }[])
+    .map((h) => ({ id: h.id, challenge_id: id, user_id: h.user_id, habit_log_id: null, checkin_date: h.checkin_date, title: "", comment: null, photo_path: null, amount: h.amount, created_at: h.created_at, hidden: true, had_photo: h.has_photo }));
+  return { challenge: c.data as Challenge | null, members: (m.data ?? []) as Member[], checkins: [...((ci.data ?? []) as CheckIn[]), ...hidden] };
 }
 
 /**

@@ -2,10 +2,11 @@ import { LegalPage } from "@/components/LegalPage";
 
 export default function Privacy() {
   return (
-    <LegalPage title="Privacy policy" updated="30 September 2026">
+    <LegalPage title="Privacy policy" updated="2 October 2026">
       <p>Frejas is run by Gabriella Blanche, Nice, France, who is responsible for your personal data. Contact: <a href="mailto:gabriella@frejas.app">gabriella@frejas.app</a>.</p>
       <h2 className="h2">What we store</h2>
       <p>Your email address (to sign you in), the name and optional photo you choose, the habits you create (with their category) and when you tick them off, and the challenges, check-ins, photos, likes and chat messages you add.</p>
+      <p>If you block someone, we store that so it keeps working. If you report something, we store the report, who sent it, and a copy of what was reported, so that we can act on it. The person you report or block is not told it was you.</p>
       <p>Photos are resized and stripped of hidden information such as GPS location before they are uploaded.</p>
       <h2 className="h2">Why</h2>
       <p>Only to run the app for you: to show your habits and statistics, and to share your challenge check-ins with the people in that challenge. The legal basis is the agreement to provide the service (GDPR art. 6.1 b).</p>

@@ -156,7 +156,7 @@ function v2Standing(c: Challenge, m: Member, mine: CheckIn[]): Standing {
     user_id: m.user_id, name: m.profiles?.display_name || "Member", avatar_path: m.profiles?.avatar_path ?? null,
     value, display, progress, done, target: total, consistency,
     finished: done / total >= (c.finish_pct ?? 80) / 100,
-    checkins: mine.length, photos: mine.filter((x) => x.photo_path).length,
+    checkins: mine.length, photos: mine.filter((x) => x.photo_path || x.had_photo).length,
     longestStreak: longest, currentStreak: current, streakUnit: "weeks",
     goalLabel: scheduleLabel(c, timesFor(c, m), thresholdFor(c, m)),
   };
@@ -188,7 +188,7 @@ function legacyStanding(c: Challenge, m: Member, mine: CheckIn[]): Standing {
     value: own ? pct : contribution, display: own ? `${pct}%` : `${fmt(contribution)} ${c.unit ?? ""}`.trim(),
     progress: own ? pct : Math.min(100, Math.round((contribution / (c.shared_target || 1)) * 100)),
     done: days.size, target: soFar, consistency: pct, finished: pct >= 80,
-    checkins: mine.length, photos: mine.filter((x) => x.photo_path).length,
+    checkins: mine.length, photos: mine.filter((x) => x.photo_path || x.had_photo).length,
     longestStreak: s.longest, currentStreak: s.current, streakUnit: "days",
     goalLabel: own ? (c.unit ? `${fmt(m.goal_amount ?? 0)} ${c.unit} / day` : "Every day") : `${fmt(c.shared_target ?? 0)} ${c.unit ?? "check-ins"} together`,
   };
