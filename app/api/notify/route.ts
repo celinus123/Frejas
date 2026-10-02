@@ -32,12 +32,12 @@ async function find(admin: SupabaseClient, me: string, name: string, b: Record<s
     if (!cm) return null;
     const { data: ci } = await admin.from("check_ins").select("user_id, challenge_id").eq("id", cm.check_in_id).maybeSingle();
     if (!ci) return null;
-    return { to: ci.user_id, key: `comment:${b.id}`, challenge: ci.challenge_id, note: { title: `${name} commented on your check-in`, body: short(cm.body, 120), url: `/challenges/${ci.challenge_id}` } };
+    return { to: ci.user_id, key: `comment:${b.id}`, challenge: ci.challenge_id, note: { title: `${name} commented on your check-in`, body: short(cm.body, 120), url: `/challenges/${ci.challenge_id}?post=${cm.check_in_id}` } };
   }
   if (kind === "comment" && uuid(b.id) && b.on === "day") {
-    const { data: cm } = await admin.from("day_comments").select("body, owner_id").eq("id", b.id).eq("user_id", me).maybeSingle();
+    const { data: cm } = await admin.from("day_comments").select("body, owner_id, day").eq("id", b.id).eq("user_id", me).maybeSingle();
     if (!cm) return null;
-    return { to: cm.owner_id, key: `comment:${b.id}`, note: { title: `${name} commented on your habits`, body: short(cm.body, 120), url: "/feed" } };
+    return { to: cm.owner_id, key: `comment:${b.id}`, note: { title: `${name} commented on your habits`, body: short(cm.body, 120), url: `/feed?post=${encodeURIComponent(`d:${cm.owner_id}:${cm.day}`)}` } };
   }
   if (kind === "friend" && uuid(b.user_id)) {
     const [a, z] = me < b.user_id ? [me, b.user_id] : [b.user_id, me];

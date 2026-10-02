@@ -65,6 +65,10 @@ function ChallengePage({ id }: { id: string }) {
   const [startOpen, setStartOpen] = useState(false);
   const [newStart, setNewStart] = useState("");
   const [openCi, setOpenCi] = useState<string | null>(null);
+  // a notification about a comment leads here with ?post=<check-in>: open it
+  const linkedPost = params.get("post");
+  useEffect(() => { if (linkedPost) setOpenCi(linkedPost); }, [linkedPost]);
+  const closeCi = () => { setOpenCi(null); if (linkedPost) window.history.replaceState(null, "", window.location.pathname); };
   const [joinOpen, setJoinOpen] = useState(false);      // the "last day to join" sheet
   const [newJoinBy, setNewJoinBy] = useState<string | null>(null);
   const [whoOpen, setWhoOpen] = useState(false);        // the "who can join" sheet
@@ -491,7 +495,7 @@ function ChallengePage({ id }: { id: string }) {
           const ci = openCi ? data!.checkins.find((x) => x.id === openCi) : null;
           return ci && userId ? (
             <PostSheet post={{ key: `c:${ci.id}`, ref: { kind: "checkin", id: ci.id }, at: ci.created_at, authorId: ci.user_id, ci, challenge: c! }} uid={userId} who={who}
-              photo={ci.photo_path ? photos[ci.photo_path] : undefined} social={socialOf(ci)} onClose={() => setOpenCi(null)}
+              photo={ci.photo_path ? photos[ci.photo_path] : undefined} social={socialOf(ci)} onClose={closeCi}
               onReact={(e) => onReact(ci, e)} onComment={(body) => onComment(ci, body)} onDelete={(cid) => onDeleteComment(ci, cid)}
               onMore={(x) => { setOpenCi(null); setSafety(x); }} />
           ) : null;

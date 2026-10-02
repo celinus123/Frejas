@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { Avatar, Empty, Sheet } from "@/components/ui";
@@ -20,6 +21,15 @@ import type { CheckIn, Habit } from "@/lib/types";
 type Item = { at: string; key: string; h: number; node: ReactNode };
 type Tab = "all" | "challenges" | "habits" | "updates";
 const TABS: [Tab, string][] = [["all", "All"], ["challenges", "Challenges"], ["habits", "Habits"], ["updates", "Updates"]];
+
+// A notification about a comment leads here with ?post=<key>: open that post.
+function PostFromLink({ onOpen }: { onOpen: (key: string) => void }) {
+  const post = useSearchParams().get("post");
+  useEffect(() => { if (post) onOpen(post); }, [post, onOpen]);
+  return null;
+}
+// …and when it is closed the address goes back to plain /feed, so the same notification opens it again next time
+const plainAddress = () => { if (window.location.search) window.history.replaceState(null, "", window.location.pathname); };
 
 export default function Feed() {
   const { userId, profile, refreshProfile, toast } = useApp();
@@ -249,9 +259,10 @@ export default function Feed() {
         <div className="feed-cols">{columns.cols.map((col, i) => <div key={i} className="feed-col">{col}</div>)}</div>
       )}
 
+      <Suspense><PostFromLink onOpen={setOpenKey} /></Suspense>
       {opened && userId && (
         <PostSheet post={opened} uid={userId} who={who} photo={opened.ci?.photo_path ? photos[opened.ci.photo_path] : undefined} social={social[opened.key] ?? noSocial}
-          onClose={() => setOpenKey(null)} onReact={(e) => onReact(opened.ref, e)} onComment={(body) => onComment(opened.ref, body)} onDelete={(id) => onDelete(opened.ref, id)}
+          onClose={() => { setOpenKey(null); plainAddress(); }} onReact={(e) => onReact(opened.ref, e)} onComment={(body) => onComment(opened.ref, body)} onDelete={(id) => onDelete(opened.ref, id)}
           onMore={(x) => { setOpenKey(null); setSafety(x); }} />
       )}
       <SafetySheet target={safety} onClose={() => setSafety(null)} onBlocked={() => load().catch(() => {})} />
