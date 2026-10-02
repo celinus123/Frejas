@@ -1,7 +1,7 @@
 "use client";
 import { supabase } from "./supabase";
 import type { Challenge, CheckIn, Habit, HabitLog, Member } from "./types";
-import { today } from "./dates";
+import { iso, today } from "./dates";
 import { nativeShare } from "./native";
 
 const sb = () => supabase();
@@ -110,7 +110,7 @@ export async function ensureHabit(c: Challenge, m: Member, uid: string): Promise
   const times = c.same_goal ? c.times_per_week : m.times_per_week ?? c.times_per_week;
   const { data, error } = await sb().from("habits").insert({
     owner_id: uid, name: c.name.slice(0, 60), frequency: c.frequency, days: c.frequency === "specific_days" ? c.days : null,
-    times_per_week: c.frequency === "times_per_week" ? times : null, starts_on: c.starts_on, from_challenge: c.id,
+    times_per_week: c.frequency === "times_per_week" ? times : null, starts_on: c.starts_on > today() ? c.starts_on : null, from_challenge: c.id,
   }).select("id").single();
   if (error || !data) return null;
   await sb().from("challenge_members").update({ habit_id: data.id }).eq("challenge_id", c.id).eq("user_id", uid);
@@ -127,6 +127,38 @@ export async function loadChallenge(id: string) {
   if (m.error) throw m.error;
   if (ci.error) throw ci.error;
   return { challenge: c.data as Challenge | null, members: (m.data ?? []) as Member[], checkins: (ci.data ?? []) as CheckIn[] };
+}
+
+/**
+ * Ticks you already made on the linked habit, inside the challenge dates, become check-ins.
+ * Used when a challenge starts in the past or its start date is moved earlier. Skipped when a check-in needs an amount.
+ */
+export async function backfillCheckins(c: Pick<Challenge, "id" | "starts_on" | "ends_on" | "unit">, habitId: string, uid: string): Promise<number> {
+  if (c.unit) return 0;
+  const to = today() < c.ends_on ? today() : c.ends_on;
+  if (to < c.starts_on) return 0;
+  const [logs, cis, habit] = await Promise.all([
+    sb().from("habit_logs").select("id, log_date, created_at").eq("habit_id", habitId).gte("log_date", c.starts_on).lte("log_date", to),
+    sb().from("check_ins").select("checkin_date").eq("challenge_id", c.id).eq("user_id", uid),
+    sb().from("habits").select("name").eq("id", habitId).maybeSingle(),
+  ]);
+  if (logs.error) throw logs.error;
+  const have = new Set(((cis.data ?? []) as { checkin_date: string }[]).map((x) => x.checkin_date));
+  const rows = ((logs.data ?? []) as { id: string; log_date: string; created_at: string }[]).filter((l) => !have.has(l.log_date))
+    .map((l) => ({ challenge_id: c.id, user_id: uid, habit_log_id: l.id, checkin_date: l.log_date, title: (habit.data as { name: string } | null)?.name ?? "Done", created_at: l.created_at }));
+  if (!rows.length) return 0;
+  const { error } = await sb().from("check_ins").insert(rows);
+  if (error) throw error;
+  return rows.length;
+}
+
+/** The linked habit starts no later than the challenge, so earlier days can be ticked on Today too. */
+export async function alignHabitStart(habitId: string, start: string) {
+  const { data } = await sb().from("habits").select("starts_on, created_at, from_challenge").eq("id", habitId).maybeSingle();
+  const h = data as Pick<Habit, "starts_on" | "created_at" | "from_challenge"> | null;
+  if (!h) return;
+  const cur = h.starts_on ?? iso(new Date(h.created_at));
+  if (start < cur) await sb().from("habits").update({ starts_on: start }).eq("id", habitId);
 }
 
 export async function loadFeed(limit = 60): Promise<CheckIn[]> {

@@ -71,8 +71,8 @@ export function isFlexible(h: Habit): boolean {
   return h.frequency === "times_per_week" || h.frequency === "every_other_week" || h.frequency === "monthly";
 }
 
-/** First day a habit is active (a future challenge's habit waits until it starts). */
-export const habitStart = (h: Habit) => (h.starts_on && h.starts_on > h.created_at.slice(0, 10) ? h.starts_on : h.created_at.slice(0, 10));
+/** First day a habit counts: the start date you picked (it may be before the habit was added), otherwise the day it was added. */
+export const habitStart = (h: Pick<Habit, "starts_on" | "created_at">) => h.starts_on ?? iso(new Date(h.created_at));
 
 export function isScheduledOn(h: Habit, date: string): boolean {
   if (isFlexible(h)) return false;

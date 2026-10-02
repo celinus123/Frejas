@@ -9,7 +9,7 @@ import { Cover } from "@/components/Cover";
 import { CheckInSheet } from "@/components/CheckInSheet";
 import { supabase } from "@/lib/supabase";
 import { addDays, diffDays, formatShort, parse, timeAgo, today, weekday } from "@/lib/dates";
-import { ensureHabit, inviteUrl, loadChallenge, myFriends, shareLink, toggleLike } from "@/lib/data";
+import { alignHabitStart, backfillCheckins, ensureHabit, inviteUrl, loadChallenge, myFriends, shareLink, toggleLike } from "@/lib/data";
 import { daysLeft, fmt, isV2, ordinal, scheduleLabel, standings, totalDays, weekResults, weeksLeft, winRuleLabel, type Standing } from "@/lib/scoring";
 import { signedUrls } from "@/lib/photos";
 import type { Challenge, CheckIn, Member, Message } from "@/lib/types";
@@ -53,6 +53,8 @@ function ChallengePage({ id }: { id: string }) {
   const [habitName, setHabitName] = useState<string | undefined>();
   const [requests, setRequests] = useState<Req[]>([]);
   const [invited, setInvited] = useState(false);
+  const [startOpen, setStartOpen] = useState(false);
+  const [newStart, setNewStart] = useState("");
   const t = today();
 
   const load = useCallback(async () => {
@@ -131,8 +133,27 @@ function ChallengePage({ id }: { id: string }) {
   }
   async function startToday() {
     await supabase().from("challenges").update({ starts_on: t }).eq("id", c!.id);
-    if (me!.habit_id) await supabase().from("habits").update({ starts_on: null }).eq("id", me!.habit_id);
+    if (me!.habit_id) await supabase().from("habits").update({ starts_on: t }).eq("id", me!.habit_id);
     toast({ text: "It starts today. Good luck!" });
+    load();
+  }
+  // the creator can move the start, e.g. back a few days to count what was already done
+  const firstCheckin = data.checkins.reduce<string | null>((a, x) => (!a || x.checkin_date < a ? x.checkin_date : a), null);
+  const maxStart = firstCheckin && firstCheckin < c.ends_on ? firstCheckin : c.ends_on;
+  async function changeStart() {
+    const d = newStart;
+    if (!d || d === c!.starts_on || d > maxStart) return;
+    const { error } = await supabase().from("challenges").update({ starts_on: d }).eq("id", c!.id);
+    if (error) { toast({ text: error.message }); return; }
+    let added = 0;
+    if (me!.habit_id) {
+      const { data: h } = await supabase().from("habits").select("from_challenge").eq("id", me!.habit_id).maybeSingle();
+      if ((h as { from_challenge: string | null } | null)?.from_challenge === c!.id) await supabase().from("habits").update({ starts_on: d }).eq("id", me!.habit_id);
+      else await alignHabitStart(me!.habit_id, d);
+      added = await backfillCheckins({ ...c!, starts_on: d }, me!.habit_id, userId!).catch(() => 0);
+    }
+    setStartOpen(false); setMenu(false);
+    toast({ text: <><b>{d > t ? "Starts" : "Started"} {formatShort(d)}.</b>{added ? ` ${added} ${added === 1 ? "day" : "days"} you'd already ticked ${added === 1 ? "is" : "are"} checked in.` : d < t ? " Tap a day in the week view to check in for it." : ""}</> });
     load();
   }
   async function leave() {
@@ -386,6 +407,23 @@ function ChallengePage({ id }: { id: string }) {
           <button className="btn btn-primary" onClick={share}><Icon name="share" />Share link</button>
           <button className="btn btn-soft" onClick={() => { setShareOpen(false); setInviteOpen(true); }}><Icon name="users" />Invite friends on Frejas</button>
         </Sheet>
+        <Sheet open={startOpen} onClose={() => setStartOpen(false)} label="Change start date">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="h1" style={{ fontSize: 22 }}>Start date</div>
+            <button className="icon-btn" aria-label="Close" onClick={() => setStartOpen(false)}><Icon name="x" /></button>
+          </div>
+          <p className="muted" style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+            Move the start earlier to count days you had already done. {group ? "Everyone in the challenge gets the extra days. " : ""}
+            {firstCheckin ? `It can't be later than the first check-in (${formatShort(firstCheckin)}).` : ""}
+          </p>
+          <label className="field"><Icon name="calendar" color="var(--ink-2)" />
+            <input type="date" value={newStart} min={addDays(t, -365)} max={maxStart} onChange={(e) => setNewStart(e.target.value)} aria-label="Start date" style={{ minHeight: 44 }} />
+          </label>
+          {newStart > maxStart && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>Pick {formatShort(maxStart)} or earlier.</div>}
+          <button className="btn btn-primary" disabled={!newStart || newStart === c!.starts_on || newStart > maxStart} onClick={changeStart}>
+            <Icon name="check" stroke={2.4} />{newStart && newStart < c!.starts_on ? `Start ${formatShort(newStart)} instead` : "Save"}
+          </button>
+        </Sheet>
         <InviteSheet open={inviteOpen} onClose={() => setInviteOpen(false)} c={c!} userId={userId!} members={data!.members} onShareLink={() => { setInviteOpen(false); setShareOpen(true); }} />
         <Sheet open={menu} onClose={() => setMenu(false)} label="Challenge menu">
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -401,6 +439,8 @@ function ChallengePage({ id }: { id: string }) {
                 <Icon name="users" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Make it a group challenge</div><div className="muted" style={{ fontSize: 12 }}>Your progress so far is kept</div></div></button>
             )}
             {group && <div className="row"><Icon name="bell" color="var(--primary)" /><div style={{ flex: 1, fontSize: 15, fontWeight: 700 }}>Mute this challenge</div><Switch on={me!.muted} onChange={mute} label="Mute" /></div>}
+            {isCreator && !finished && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => { setNewStart(c!.starts_on); setMenu(false); setStartOpen(true); }}>
+              <Icon name="calendar" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Change start date</div><div className="muted" style={{ fontSize: 12 }}>{upcoming ? "Starts" : "Started"} {formatShort(c!.starts_on)} · move it earlier to count days you already did</div></div></button>}
             {group && isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={newLink}>
               <Icon name="shield" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>Make a new invite link</div><div className="muted" style={{ fontSize: 12 }}>The old link stops working</div></div></button>}
             {!isCreator && <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={leave}>
@@ -519,7 +559,7 @@ function Chat({ c, userId, members }: { c: Challenge; userId: string; members: M
 
   return (
     <>
-      <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "0 6px" }}>
         {msgs === null && <div className="skeleton" style={{ height: 120 }} />}
         {msgs?.length === 0 && <div className="muted" style={{ textAlign: "center", fontSize: 14, padding: 20 }}>Say hi to the group 👋</div>}
         {msgs?.map((m, i) => {

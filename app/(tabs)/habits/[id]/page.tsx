@@ -6,7 +6,7 @@ import { Flame, Icon } from "@/components/Icon";
 import { Ring } from "@/components/Ring";
 import { BackBar } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
-import { addDays, frequencyLabel, isFlexible, isScheduledOn, monthDays, parse, today, weekday } from "@/lib/dates";
+import { addDays, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, today, weekday } from "@/lib/dates";
 import { logHabit, unlogHabit } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
 
@@ -36,7 +36,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
 
   const days = monthDays(month.y, month.m);
   const flexible = isFlexible(habit);
-  const due = (d: string) => (flexible ? d <= t && d >= habit.created_at.slice(0, 10) : isScheduledOn(habit, d) && d <= t);
+  const due = (d: string) => (flexible ? d <= t && d >= habitStart(habit) : isScheduledOn(habit, d) && d <= t);
   const dueDays = days.filter(due);
   const monthDone = days.filter((d) => done.has(d)).length;
   const pct = flexible ? null : dueDays.length ? Math.round((dueDays.filter((d) => done.has(d)).length / dueDays.length) * 100) : 0;
@@ -46,7 +46,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
   if (!flexible) {
     let d = done.has(t) || !isScheduledOn(habit, t) ? t : addDays(t, -1);
     for (let i = 0; i < 400; i++, d = addDays(d, -1)) {
-      if (d < habit.created_at.slice(0, 10)) break;
+      if (d < habitStart(habit)) break;
       if (!isScheduledOn(habit, d)) continue;
       if (done.has(d)) streak++; else break;
     }
@@ -74,6 +74,7 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
           <span className="tag" style={{ display: "flex", gap: 4, alignItems: "center", background: "var(--surface)", boxShadow: "var(--shadow)" }}>
             <Icon name={habit.visibility === "friends" ? "users" : "lock"} size={13} />{habit.visibility === "friends" ? "Friends" : "Private"}
           </span>
+          <span className="tag">Since {formatShort(habitStart(habit))}</span>
           {habit.archived_at && <span className="tag">Archived</span>}
         </div>
       </div>

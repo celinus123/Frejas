@@ -44,6 +44,11 @@ export default function Feed() {
     const fh = ids.length ? ((await supabase().from("habits").select("*").in("owner_id", ids).eq("visibility", "friends").is("archived_at", null)).data ?? []) as Habit[] : [];
     const fl = fh.length ? ((await supabase().from("habit_logs").select("habit_id, log_date, created_at").in("habit_id", fh.map((h) => h.id)).gte("log_date", addDays(t, -40))).data ?? []) as { habit_id: string; log_date: string; created_at: string }[] : [];
 
+    // a habit that counts for a challenge already shows up as a check-in, so it isn't repeated as a habit tick
+    const chIds = c.map((x) => x.challenge.id);
+    const linked = new Set(chIds.length ? (((await supabase().from("challenge_members").select("habit_id").in("challenge_id", chIds)).data ?? []) as { habit_id: string | null }[]).map((r) => r.habit_id) : []);
+    const shared = [...mh.filter((h) => h.visibility === "friends"), ...fh].filter((h) => !linked.has(h.id));
+
     const relevant = c.filter((x) => x.challenge.status !== "draft" && ((x.challenge.ends_on < t && x.challenge.ends_on >= addDays(t, -14)) || (x.challenge.starts_on <= t && x.challenge.ends_on >= t && !x.challenge.solo)));
     const cd = await Promise.all(relevant.map((x) => loadChallenge(x.challenge.id)));
 
@@ -54,7 +59,7 @@ export default function Feed() {
     setCards([
       ...recapCards(mh, myLogs),
       ...goalCards([...mh, ...fh], [...myLogs, ...fl], whoOf),
-      ...friendDayCards(fh, fl, whoOf),
+      ...friendDayCards(shared, [...myLogs, ...fl], whoOf),
       ...challengeCards(cd.filter((x) => x.challenge).map((x) => ({ challenge: x.challenge!, members: x.members, checkins: x.checkins })), userId),
     ]);
   }, [userId, t, profile?.avatar_path]);
@@ -131,8 +136,8 @@ export default function Feed() {
     const tag = c && <Link href={`/challenges/${c.id}`} style={{ fontSize: 11, fontWeight: 700, color: "var(--primary)", textDecoration: "none" }}>{c.name}{c.solo ? " · just you" : ""}</Link>;
     if (x.photo_path) return (
       <div key={x.id} className="card" style={{ borderRadius: 22, overflow: "hidden" }}>
-        <div style={{ position: "relative", background: "var(--soft)", minHeight: 120 }}>
-          {photos[x.photo_path] && <img src={photos[x.photo_path]} alt={x.title} style={{ width: "100%", display: "block", maxHeight: 260, objectFit: "cover" }} />}
+        <div style={{ position: "relative", background: "var(--soft)", aspectRatio: "4 / 5" }}>
+          {photos[x.photo_path] && <img src={photos[x.photo_path]} alt={x.title} style={{ width: "100%", display: "block", aspectRatio: "4 / 5", objectFit: "cover" }} />}
           <div style={{ position: "absolute", top: 8, left: 8 }}>{tick(24)}</div>
         </div>
         <div style={{ padding: "10px 12px 12px", display: "flex", flexDirection: "column", gap: 6 }}>
@@ -188,7 +193,7 @@ export default function Feed() {
       case "friendDay":
         return (
           <section key={card.id} className="card" style={{ borderRadius: 22, padding: "12px 14px", display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <Avatar name={card.who.name} path={card.who.path} size={36} />
+            <Avatar name={card.who.you ? profile?.display_name ?? "" : card.who.name} path={card.who.path} size={36} />
             <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 6 }}>
               <div style={{ fontSize: 14 }}><b>{card.who.name}</b> did {card.habits.length === 1 ? "a habit" : `${card.habits.length} habits`} {card.date === t ? "today" : card.date === addDays(t, -1) ? "yesterday" : `on ${parse(card.date).toLocaleDateString("en-GB", { weekday: "long" })}`}</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>

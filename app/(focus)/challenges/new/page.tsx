@@ -7,7 +7,7 @@ import { Avatar, Sheet } from "@/components/ui";
 import { Cover, PRESETS } from "@/components/Cover";
 import { supabase } from "@/lib/supabase";
 import { addDays, formatShort, iso, parse, startOfWeek, today } from "@/lib/dates";
-import { loadHabits, myFriends } from "@/lib/data";
+import { alignHabitStart, backfillCheckins, loadHabits, myFriends } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
 import { uploadCover } from "@/lib/photos";
 import { planWeeks, scheduleLabel } from "@/lib/scoring";
@@ -171,15 +171,18 @@ function NewChallenge() {
         const { data, error: he } = await supabase().from("habits").insert({
           owner_id: userId, name: name.trim().slice(0, 60), frequency: freq,
           days: freq === "specific_days" ? [...days].sort() : null, times_per_week: freq === "times_per_week" ? times : null,
-          starts_on: start > t ? start : null, from_challenge: cid,
+          starts_on: start !== t ? start : null, from_challenge: cid,
         }).select("id").single();
         if (he) throw he;
         habit = data;
       }
+      // started earlier: the habit covers those days too, and ticks already made in that time count
+      if (linkTo && start < t) await alignHabitStart(linkTo, start);
       const { error: me } = await supabase().from("challenge_members").insert({
         challenge_id: cid, user_id: userId, habit_id: habit.id, goal_amount: unit ? minAmount : null, times_per_week: freq === "times_per_week" ? times : null,
       });
       if (me && me.code !== "23505") throw me;
+      if (linkTo) await backfillCheckins({ id: cid, starts_on: start, ends_on: end, unit: unit || null }, linkTo, userId).catch(() => 0);
       if (!solo && invitees.size) {
         await supabase().from("challenge_invites").insert([...invitees].map((u) => ({ challenge_id: cid, user_id: u, invited_by: userId })));
       }
@@ -297,11 +300,13 @@ function NewChallenge() {
           {startOpts.map((o) => <button key={o.l} className="chip" aria-pressed={start === o.v} onClick={() => setStart(o.v)}>{o.l}</button>)}
           <label className="chip" aria-pressed={custom} style={{ position: "relative", cursor: "pointer" }}>
             <Icon name="calendar" size={15} />{custom ? formatShort(start) : "Pick a date"}
-            <input type="date" min={t} value={start} onChange={(e) => e.target.value && setStart(e.target.value)} aria-label="Start date"
+            <input type="date" min={addDays(t, -365)} value={start} onChange={(e) => e.target.value && setStart(e.target.value)} aria-label="Start date"
               style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
           </label>
         </div>
 
+        {start < t && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px", lineHeight: 1.45 }}>
+          It already started, so the days since {formatShort(start)} count. {linkTo && !unit ? "Days you've ticked on the habit are checked in for you." : "Check in for them from the challenge's week view."}</div>}
         <div className="label">For how long</div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {([["2w", "2 weeks"], ["1m", "1 month"], ["2m", "2 months"]] as [Dur, string][]).map(([v, l]) => <button key={v} className="chip" aria-pressed={dur === v} onClick={() => setDur(v)}>{l}</button>)}
@@ -317,7 +322,7 @@ function NewChallenge() {
           <div>
             <div style={{ fontSize: 15, fontWeight: 800 }}>{name.trim() || "Your challenge"} · {schedule}</div>
             <div className="muted" style={{ fontSize: 12.5, marginTop: 2 }}>
-              {start === t ? "Starts today" : `Starts ${parse(start).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}`} · {sessions} sessions over {weeks} weeks
+              {start === t ? "Starts today" : `${start < t ? "Started" : "Starts"} ${parse(start).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}`} · {sessions} sessions over {weeks} weeks
               {freq === "times_per_week" && ". Extra sessions count as bonus."}
             </div>
           </div>
@@ -348,10 +353,11 @@ function NewChallenge() {
             </div>
           </>
         )}
+        {end < t && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700 }}>With that start date it would already be over. Pick a later end.</div>}
         {errBox}
         <div style={{ flex: 1 }} />
-        {solo ? <button className="btn btn-primary" disabled={busy || (freq === "specific_days" && !days.length)} onClick={create} style={{ marginTop: 10 }}><Icon name="check" stroke={2.4} />{busy ? "Creating…" : "Create challenge"}</button>
-          : <button className="btn btn-primary" disabled={freq === "specific_days" && !days.length} onClick={() => setStep(3)} style={{ marginTop: 10 }}>Next</button>}
+        {solo ? <button className="btn btn-primary" disabled={busy || end < t || (freq === "specific_days" && !days.length)} onClick={create} style={{ marginTop: 10 }}><Icon name="check" stroke={2.4} />{busy ? "Creating…" : "Create challenge"}</button>
+          : <button className="btn btn-primary" disabled={end < t || (freq === "specific_days" && !days.length)} onClick={() => setStep(3)} style={{ marginTop: 10 }}>Next</button>}
       </main>
     );
   }

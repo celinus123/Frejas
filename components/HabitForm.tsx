@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { frequencyLabel } from "@/lib/dates";
+import { addDays, formatShort, frequencyLabel, habitStart, isScheduledOn, today } from "@/lib/dates";
 import type { Frequency, Habit } from "@/lib/types";
 import { useApp } from "./AppProvider";
 import { Icon } from "./Icon";
@@ -28,6 +28,9 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [times, setTimes] = useState(habit?.times_per_week ?? 3);
   const [category, setCategory] = useState<string | null>(habit?.category ?? null);
   const [shared, setShared] = useState(habit ? habit.visibility === "friends" : !(profile?.new_habits_private ?? true));
+  const t = today();
+  const [start, setStart] = useState(habit ? habitStart(habit) : t);   // first day it counts; may be before today
+  const [fill, setFill] = useState(true);                              // tick the days since then
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [used, setUsed] = useState<string[]>([]);       // categories on your other habits
@@ -65,6 +68,14 @@ export function HabitForm({ habit }: { habit?: Habit }) {
 
   const valid = name.trim().length > 0 && (freq !== "specific_days" || days.length > 0);
 
+  // days between an earlier start and yesterday that this schedule asks for (only fixed schedules can be filled in for you)
+  const fixed = freq === "daily" || freq === "specific_days";
+  const backDays: string[] = [];
+  if (!habit && fixed && start < t) {
+    const probe = { frequency: freq, days: freq === "specific_days" ? days : null, starts_on: start, created_at: new Date().toISOString() } as Habit;
+    for (let d = start; d < t && backDays.length < 366; d = addDays(d, 1)) if (isScheduledOn(probe, d)) backDays.push(d);
+  }
+
   async function save() {
     if (!userId || !valid) return;
     setBusy(true); setErr(null);
@@ -73,14 +84,24 @@ export function HabitForm({ habit }: { habit?: Habit }) {
       days: freq === "specific_days" ? [...days].sort() : null,
       times_per_week: freq === "times_per_week" ? times : null,
       category, visibility: shared ? "friends" : "private",
+      ...(habit ? (start !== habitStart(habit) ? { starts_on: start } : {}) : { starts_on: start < t ? start : null }),
     };
-    const q = habit
-      ? supabase().from("habits").update(row).eq("id", habit.id)
-      : supabase().from("habits").insert({ ...row, owner_id: userId });
-    const { error } = await q;
+    if (habit) {
+      const { error } = await supabase().from("habits").update(row).eq("id", habit.id);
+      setBusy(false);
+      if (error) return setErr(error.message);
+      router.replace(`/habits/${habit.id}`);
+      return;
+    }
+    const { data, error } = await supabase().from("habits").insert({ ...row, owner_id: userId }).select("id").single();
+    if (error) { setBusy(false); return setErr(error.message); }
+    if (fill && backDays.length) {
+      const { error: le } = await supabase().from("habit_logs").insert(backDays.map((d) => ({ habit_id: data.id, user_id: userId, log_date: d, created_at: new Date(`${d}T12:00:00`).toISOString() })));
+      if (le) toast({ text: "Habit saved, but the earlier days couldn't be ticked. Fill them in on Today." });
+      else toast({ text: <><b>{backDays.length} earlier {backDays.length === 1 ? "day" : "days"} ticked.</b> Tap a date on Today to change one.</> });
+    } else if (start < t) toast({ text: <>Started {formatShort(start)}. Tap a date on Today to tick what you did.</> });
     setBusy(false);
-    if (error) return setErr(error.message);
-    router.replace(habit ? `/habits/${habit.id}` : "/");
+    router.replace("/");
   }
 
   async function archive() {
@@ -161,6 +182,29 @@ export function HabitForm({ habit }: { habit?: Habit }) {
         {["times_per_week", "every_other_week", "monthly"].includes(freq) && " · any day you like, under This week on Today"}
       </div>
 
+      <div className="label">{habit ? "Started" : "Starts"}</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {!habit && <button className="chip" aria-pressed={start === t} onClick={() => setStart(t)}>Today</button>}
+        {!habit && <button className="chip" aria-pressed={start === addDays(t, -1)} onClick={() => setStart(addDays(t, -1))}>Yesterday</button>}
+        {habit && habitStart(habit) > t ? <span className="chip"><Icon name="calendar" size={15} />{formatShort(start)} · with its challenge</span> :
+        <label className="chip" aria-pressed={!!habit || (start !== t && start !== addDays(t, -1))} style={{ position: "relative", cursor: "pointer" }}>
+          <Icon name="calendar" size={15} />{habit || (start !== t && start !== addDays(t, -1)) ? formatShort(start) : "Earlier date"}
+          <input type="date" max={t} min={addDays(t, -365)} value={start} onChange={(e) => e.target.value && setStart(e.target.value > t ? t : e.target.value)} aria-label="Start date"
+            style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }} />
+        </label>}
+      </div>
+      {!habit && start < t && (fixed ? (
+        <div className="card" style={{ borderRadius: 16 }}>
+          <div className="row">
+            <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700 }}>I did it every time since then</div>
+              <div className="muted" style={{ fontSize: 12 }}>{fill ? `Ticks ${backDays.length} ${backDays.length === 1 ? "day" : "days"} for you, ${formatShort(start)} to yesterday` : "You tick the earlier days yourself on Today"}</div></div>
+            <Switch on={fill} onChange={setFill} label="Tick the days since the start" />
+          </div>
+        </div>
+      ) : <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>Counts from {formatShort(start)}. After saving, tap a date on Today to tick the days you did it.</div>)}
+      {habit && start !== habitStart(habit) && <div className="muted" style={{ fontSize: 12.5, padding: "0 4px" }}>
+        {start < habitStart(habit) ? "Days from then on count. Tap a date on Today to tick what you did." : "Days before this date stop counting. Ticks you made are kept."}</div>}
+
       <div className="label">Category <span style={{ fontWeight: 600 }}>· optional</span></div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {options.map((c) => <button key={c} className="chip" aria-pressed={!!category && same(category, c)} onClick={() => pick(c)}>{c}</button>)}
@@ -206,7 +250,7 @@ export function HabitForm({ habit }: { habit?: Habit }) {
                 <div style={{ display: "flex", gap: 8, padding: "0 16px 14px" }}>
                   <label className="field" style={{ flex: 1, minHeight: 44 }}>
                     <select value={mergeInto} onChange={(e) => setMergeInto(e.target.value)} aria-label="Merge into"
-                      style={{ border: 0, background: "none", width: "100%", fontSize: 14.5, fontWeight: 700, outline: 0, color: "var(--ink)" }}>
+                      style={{ border: 0, background: "none", width: "100%", fontSize: 16, fontWeight: 700, outline: 0, color: "var(--ink)" }}>
                       <option value="">Merge into…</option>
                       {others.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>

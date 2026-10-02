@@ -147,7 +147,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
             <>
               <div className="label">Counts on</div>
               <label className="field"><Icon name="sun" color="var(--ink-2)" />
-                <select value={habitId} onChange={(e) => setHabitId(e.target.value)} aria-label="Habit" style={{ border: 0, background: "none", width: "100%", fontSize: 15, fontWeight: 700, outline: 0 }}>
+                <select value={habitId} onChange={(e) => setHabitId(e.target.value)} aria-label="Habit" style={{ border: 0, background: "none", width: "100%", fontSize: 16, fontWeight: 700, outline: 0 }}>
                   <option value="new">New habit: {inv.name}</option>
                   {habits.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
                 </select>

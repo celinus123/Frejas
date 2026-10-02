@@ -197,9 +197,7 @@ export default function Today() {
           {week.map((d) => (
             <div key={d} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
               <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>{parse(d).toLocaleDateString("en-GB", { weekday: "narrow" })}</span>
-              <div style={{ borderRadius: "50%", boxShadow: d === sel && !isToday ? "0 0 0 2px var(--primary)" : undefined }}>
-                <DayCircle day={parse(d).getDate()} fraction={dayFraction(habits, done, d)} today={d === t} future={d > t} onClick={() => pickDay(d)} />
-              </div>
+              <DayCircle day={parse(d).getDate()} fraction={dayFraction(habits, done, d)} today={d === t} future={d > t} selected={d === sel} onClick={() => pickDay(d)} />
             </div>
           ))}
         </div>
@@ -306,10 +304,11 @@ export default function Today() {
                       <div className="muted" style={{ fontSize: 12.5 }}>{frequencyLabel(h)} · {Math.min(count, p.target)} of {p.target} {p.label.toLowerCase()}
                         {count > p.target && <span className="tag tag-accent" style={{ marginLeft: 6, fontWeight: 800, color: "var(--ink)" }}>+{count - p.target} bonus</span>}</div>
                     </Link>
-                    <Ring size={34} stroke={4} pct={(Math.min(count, p.target) / p.target) * 100} />
-                    <button className="check" aria-pressed={todayDone} aria-label={todayDone ? `Undo ${h.name} for ${dayTitle}` : `Log ${h.name} for ${dayTitle}`} onClick={() => toggle(h)}
-                      style={!todayDone ? { color: "var(--primary)" } : undefined}>
-                      <Icon name={todayDone ? "check" : "plus"} stroke={2.3} size={todayDone ? 20 : 18} />
+                    <button className="flex-check" aria-pressed={todayDone} onClick={() => toggle(h)}
+                      aria-label={todayDone ? `Undo ${h.name} for ${dayTitle}` : `Log ${h.name} for ${dayTitle}. ${count} of ${p.target} done`}>
+                      <Ring size={40} stroke={4} pct={(Math.min(count, p.target) / p.target) * 100} track="var(--ring-track)">
+                        {todayDone && <span className="flex-check-dot"><Icon name="check" stroke={2.6} size={15} /></span>}
+                      </Ring>
                     </button>
                   </div>
                   </SwipeRow>

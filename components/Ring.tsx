@@ -22,9 +22,9 @@ export function Ring({ size, stroke, pct, track = "var(--soft)", color = "var(--
   );
 }
 
-/** Calendar day: full = all done, ring = share done, plain = nothing (never red). */
-export function DayCircle({ day, fraction, today = false, future = false, size = 36, onClick }:
-  { day: number; fraction: number | null; today?: boolean; future?: boolean; size?: number; onClick?: () => void }) {
+/** Calendar day: full = all done, ring = share done, plain = nothing (never red). `selected` draws a round ring just outside it. */
+export function DayCircle({ day, fraction, today = false, future = false, selected = false, size = 36, onClick }:
+  { day: number; fraction: number | null; today?: boolean; future?: boolean; selected?: boolean; size?: number; onClick?: () => void }) {
   const label = <span style={{ fontSize: 13, fontWeight: today ? 800 : 700, color: future ? "var(--ink-2)" : undefined }}>{day}</span>;
   let inner;
   if (!future && fraction !== null && fraction >= 1) {
@@ -36,8 +36,14 @@ export function DayCircle({ day, fraction, today = false, future = false, size =
   } else {
     inner = <Ring size={size} stroke={3.5} pct={fraction * 100} cap="butt">{label}</Ring>;
   }
-  const wrapStyle = { borderRadius: "50%", background: today ? "var(--soft-l)" : undefined, boxShadow: today ? "0 0 0 3px var(--soft-l)" : undefined };
+  // today gets a soft halo; the selected day gets a ring with a small gap, outside the progress colours
+  const halo = today ? "0 0 0 3px var(--soft-l)" : "0 0 0 2px var(--surface)";
+  const wrapStyle = {
+    display: "block", width: size, height: size, lineHeight: 0, borderRadius: "50%", flexShrink: 0,
+    background: today ? "var(--soft-l)" : "none",
+    boxShadow: selected ? `${halo}, 0 0 0 ${today ? 5 : 4}px var(--primary)` : today ? halo : undefined,
+  } as const;
   if (onClick && !future)
-    return <button onClick={onClick} aria-label={`Day ${day}`} style={{ ...wrapStyle, border: 0, padding: 0, background: wrapStyle.background ?? "none" }}>{inner}</button>;
+    return <button onClick={onClick} aria-label={`Day ${day}`} aria-pressed={selected} style={{ ...wrapStyle, border: 0, padding: 0, color: "inherit" }}>{inner}</button>;
   return <div style={wrapStyle}>{inner}</div>;
 }
