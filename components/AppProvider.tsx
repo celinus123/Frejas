@@ -25,7 +25,9 @@ export const useApp = () => {
   return c;
 };
 
-const PUBLIC = ["/welcome", "/join", "/add", "/privacy", "/terms"];
+const PUBLIC = ["/welcome", "/join", "/add", "/privacy", "/terms", "/site"];
+// the website: shown straight away, without waiting to find out whether someone is signed in
+const SITE = ["/site"];
 
 function applyTheme(t: Profile["theme"]) {
   const el = document.documentElement;
@@ -139,7 +141,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }), [session, profile, loadProfile, toast, reportsOpen, refreshReports]);
 
   const isPublic = PUBLIC.some((p) => path.startsWith(p));
-  const blocked = !ready || (!session && !isPublic);
+  const blocked = !SITE.some((p) => path.startsWith(p)) && (!ready || (!session && !isPublic));
 
   // has the page scrolled? (only flips when crossing the top, so it costs nothing while scrolling)
   const [scrolled, setScrolled] = useState(false);
