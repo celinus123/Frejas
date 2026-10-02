@@ -8,7 +8,7 @@ import { useApp } from "./AppProvider";
 import { Icon } from "./Icon";
 import { Switch } from "./ui";
 import { MAX_CATEGORIES, SUGGESTED_CATEGORIES, categoriesOf } from "./CategoryFilter";
-import { loadHabits } from "@/lib/data";
+import { loadHabits, pairHabits, unpairHabit } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
 
 const FREQS: { v: Frequency; l: string }[] = [
@@ -40,6 +40,7 @@ export function HabitForm({ habit }: { habit?: Habit }) {
   const [others, setOthers] = useState<Habit[]>([]);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeInto, setMergeInto] = useState("");
+  const [mergeHow, setMergeHow] = useState<"this" | "other" | "both">("this");   // which one stays, or both
   const nameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -115,14 +116,31 @@ export function HabitForm({ habit }: { habit?: Habit }) {
     router.replace("/");
   }
 
+  // Two habits that are really one: keep this one, keep the other one, or keep both and tick them together.
   async function merge() {
     if (!habit || !mergeInto) return;
-    const target = others.find((o) => o.id === mergeInto);
-    if (!target || !confirm(`Merge "${habit.name}" into "${target.name}"? All ticks move over and "${habit.name}" disappears. Challenges it counted for will count "${target.name}" instead.`)) return;
-    const { error } = await supabase().rpc("merge_habits", { p_from: habit.id, p_into: target.id });
+    const other = others.find((o) => o.id === mergeInto);
+    if (!other) return;
+    setErr(null);
+    if (mergeHow === "both") {
+      try { await pairHabits(habit, other); }
+      catch (e) { return setErr(/linked_habit_id/.test((e as Error).message) ? "Ticking two habits together isn't switched on yet. Try again in a little while." : (e as Error).message); }
+      toast({ text: <><b>{habit.name}</b> and <b>{other.name}</b> are now ticked together.</> });
+      router.replace(`/habits/${habit.id}`);
+      return;
+    }
+    const [from, into] = mergeHow === "this" ? [other, habit] : [habit, other];
+    if (!confirm(`Keep "${into.name}"? All ticks from "${from.name}" move over and "${from.name}" disappears. Challenges it counted for will count "${into.name}" instead.`)) return;
+    const { error } = await supabase().rpc("merge_habits", { p_from: from.id, p_into: into.id });
     if (error) return setErr(error.message);
-    toast({ text: <>Merged into <b>{target.name}</b>.</> });
-    router.replace(`/habits/${target.id}`);
+    toast({ text: <>Merged into <b>{into.name}</b>. All ticks are kept.</> });
+    router.replace(`/habits/${into.id}`);
+  }
+  async function unpair() {
+    if (!habit) return;
+    try { await unpairHabit(habit); } catch (e) { return setErr((e as Error).message); }
+    toast({ text: "They're ticked separately again." });
+    router.replace(`/habits/${habit.id}`);
   }
 
   async function remove() {
@@ -242,24 +260,47 @@ export function HabitForm({ habit }: { habit?: Habit }) {
             <Icon name="archive" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{habit.archived_at ? "Restore habit" : "Archive habit"}</div>
               <div className="muted" style={{ fontSize: "var(--t-sub)" }}>Hide it from Today, keep your history</div></div>
           </button>
+          {habit.linked_habit_id && others.some((o) => o.id === habit.linked_habit_id) && (
+            <div className="row">
+              <Icon name="link" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Ticked together with {others.find((o) => o.id === habit.linked_habit_id)!.name}</div>
+                <div className="muted" style={{ fontSize: "var(--t-sub)" }}>Ticking one ticks the other</div></div>
+              <button className="btn btn-soft btn-sm" onClick={unpair}>Separate</button>
+            </div>
+          )}
           {others.length > 0 && (
             <div>
-              <button className="row" onClick={() => setMergeOpen((v) => !v)} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
+              <button className="row" onClick={() => setMergeOpen((v) => !v)} aria-expanded={mergeOpen} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>
                 <Icon name="repeat" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Merge with another habit</div>
-                  <div className="muted" style={{ fontSize: "var(--t-sub)" }}>For duplicates. Keeps all ticks from both</div></div>
+                  <div className="muted" style={{ fontSize: "var(--t-sub)" }}>Make two into one, or keep both and tick them together</div></div>
               </button>
-              {mergeOpen && (
-                <div style={{ display: "flex", gap: 8, padding: "0 16px 14px" }}>
-                  <label className="field" style={{ flex: 1, minHeight: 44 }}>
-                    <select value={mergeInto} onChange={(e) => setMergeInto(e.target.value)} aria-label="Merge into"
-                      style={{ border: 0, background: "none", width: "100%", fontSize: 16, fontWeight: 700, outline: 0, color: "var(--ink)" }}>
-                      <option value="">Merge into…</option>
-                      {others.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-                    </select>
-                  </label>
-                  <button className="btn btn-primary btn-sm" disabled={!mergeInto} onClick={merge}>Merge</button>
-                </div>
-              )}
+              {mergeOpen && (() => {
+                const other = others.find((o) => o.id === mergeInto);
+                const choice = (v: typeof mergeHow, title: React.ReactNode, sub: string) => (
+                  <button role="radio" aria-checked={mergeHow === v} onClick={() => setMergeHow(v)} style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 13px", borderRadius: 16, border: 0, textAlign: "left", width: "100%", background: mergeHow === v ? "var(--soft)" : "var(--surface)", boxShadow: mergeHow === v ? "inset 0 0 0 2px var(--primary)" : "var(--shadow)" }}>
+                    <span style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{mergeHow === v && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--primary)" }} />}</span>
+                    <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: "block", fontSize: "var(--t-title)", fontWeight: 800 }}>{title}</span><span className="muted" style={{ display: "block", fontSize: "var(--t-sub)", marginTop: 1, lineHeight: 1.35 }}>{sub}</span></span>
+                  </button>
+                );
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, padding: "0 16px 14px" }}>
+                    <label className="field" style={{ minHeight: 44 }}>
+                      <select value={mergeInto} onChange={(e) => setMergeInto(e.target.value)} aria-label="Which habit"
+                        style={{ border: 0, background: "none", width: "100%", fontSize: 16, fontWeight: 700, outline: 0, color: "var(--ink)" }}>
+                        <option value="">Which habit?</option>
+                        {others.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                      </select>
+                    </label>
+                    {other && (
+                      <div role="radiogroup" aria-label="What should happen" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {choice("this", <>Keep {habit.name}</>, `${other.name} disappears. All its ticks move to ${habit.name}.`)}
+                        {choice("other", <>Keep {other.name}</>, `${habit.name} disappears. All its ticks move to ${other.name}.`)}
+                        {choice("both", "Keep both, tick them together", "Ticking one ticks the other. Each keeps its own name, schedule and history.")}
+                        <button className="btn btn-primary btn-sm" style={{ alignSelf: "flex-end", marginTop: 2 }} onClick={merge}>{mergeHow === "both" ? "Tick them together" : `Merge into ${mergeHow === "this" ? habit.name : other.name}`}</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
           <button className="row" onClick={remove} style={{ width: "100%", border: 0, background: "none", textAlign: "left" }}>

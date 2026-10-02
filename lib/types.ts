@@ -24,6 +24,7 @@ export interface Habit {
   archived_at: string | null;
   starts_on: string | null;
   from_challenge: string | null; // set when the habit was made for a challenge
+  linked_habit_id?: string | null; // its pair: ticking one ticks the other (database change 010)
   created_at: string;
 }
 

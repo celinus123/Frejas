@@ -34,7 +34,7 @@ export default function AddFriend({ params }: { params: Promise<{ code: string }
 
   const box = (children: React.ReactNode) => (
     <main className="page" style={{ minHeight: "100dvh", paddingBottom: 30, gap: 18 }}>
-      <div style={{ marginTop: 50, display: "flex", justifyContent: "center" }}><FrejasLockup mark={72} word={24} /></div>
+      <div style={{ marginTop: 50, display: "flex", justifyContent: "center" }}><FrejasLockup mark={72} /></div>
       {children}
     </main>
   );

@@ -1,6 +1,8 @@
 /* The Frejas mark: an F cut out of the page, with layers of paper behind it.
    The page colour shows around it, so it works in light and dark mode. */
-export function FrejasMark({ size = 96, title = "Frejas" }: { size?: number; title?: string }) {
+export function FrejasMark({ size = 96, title = "Frejas", onRaspberry = false }: { size?: number; title?: string; onRaspberry?: boolean }) {
+  // on a raspberry page the raspberry layer is one step darker, otherwise it melts into the background
+  const mid = onRaspberry ? "#8A1746" : "#B01E57";
   return (
     <svg width={size} height={size} viewBox="100 70 290 340" role="img" aria-label={title} style={{ display: "block" }}>
       
@@ -9,7 +11,7 @@ export function FrejasMark({ size = 96, title = "Frejas" }: { size?: number; tit
 <filter id="frejasF-cut" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur in="SourceAlpha" stdDeviation="8" /><feOffset dx="3" dy="8" result="o" />
 <feComposite in="SourceAlpha" in2="o" operator="out" result="inner" /><feFlood floodColor="#2E0B19" floodOpacity="0.6" /><feComposite in2="inner" operator="in" /></filter></defs>
 
-<g clipPath="url(#frejasF-clip)"><path d="M0 0 H480 V480 H0Z" fill="#4A1230" filter="url(#frejasF-layer)" /><path d="M-10 480 V120 C60 90 110 170 190 150 C270 130 300 190 360 200 C420 210 450 170 490 250 V480 Z" fill="#B01E57" filter="url(#frejasF-layer)" /><path d="M-10 480 V210 C50 190 100 250 170 240 C250 228 290 280 350 290 C410 300 450 270 490 330 V480 Z" fill="#D98FAA" filter="url(#frejasF-layer)" /><path d="M-10 480 V300 C60 280 110 330 180 320 C250 310 300 360 360 370 C420 380 450 360 490 420 V480 Z" fill="#FEDFE2" filter="url(#frejasF-layer)" /><path d="M96 410 C104 352 170 338 204 362 C236 384 222 424 188 432 C160 438 150 420 132 430 C118 438 100 440 96 410 Z" fill="#FFF7E6" filter="url(#frejasF-layer)" /><circle cx="252" cy="344" r="9" fill="#FFF7E6" filter="url(#frejasF-layer)" /><circle cx="300" cy="262" r="7" fill="#FEDFE2" filter="url(#frejasF-layer)" /></g>
+<g clipPath="url(#frejasF-clip)"><path d="M0 0 H480 V480 H0Z" fill="#4A1230" filter="url(#frejasF-layer)" /><path d="M-10 480 V120 C60 90 110 170 190 150 C270 130 300 190 360 200 C420 210 450 170 490 250 V480 Z" fill={mid} filter="url(#frejasF-layer)" /><path d="M-10 480 V210 C50 190 100 250 170 240 C250 228 290 280 350 290 C410 300 450 270 490 330 V480 Z" fill="#D98FAA" filter="url(#frejasF-layer)" /><path d="M-10 480 V300 C60 280 110 330 180 320 C250 310 300 360 360 370 C420 380 450 360 490 420 V480 Z" fill="#FEDFE2" filter="url(#frejasF-layer)" /><path d="M96 410 C104 352 170 338 204 362 C236 384 222 424 188 432 C160 438 150 420 132 430 C118 438 100 440 96 410 Z" fill="#FFF7E6" filter="url(#frejasF-layer)" /><circle cx="252" cy="344" r="9" fill="#FFF7E6" filter="url(#frejasF-layer)" /><circle cx="300" cy="262" r="7" fill="#FEDFE2" filter="url(#frejasF-layer)" /></g>
 <g filter="url(#frejasF-cut)"><rect x="118" y="86" width="96" height="308" rx="48" fill="#FFFFFF"  /><rect x="118" y="86" width="252" height="96" rx="48" fill="#FFFFFF"  /><rect x="118" y="214" width="206" height="92" rx="46" fill="#FFFFFF"  /></g>
     </svg>
   );
@@ -24,13 +26,11 @@ export function FrejasWordmark({ height = 30, color = "var(--primary)" }: { heig
   );
 }
 
-export function FrejasLockup({ mark = 96, word = 30 }: { mark?: number; word?: number }) {
+/* The logo as it is shown in the app: the F on its own. (The word "Frejas" is not used until it has a typeface of its own.) */
+export function FrejasLockup({ mark = 96, onRaspberry = false }: { mark?: number; word?: number; onRaspberry?: boolean }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: Math.round(mark * 0.16) }}>
-      {/* The F is heavier on its left side (the stem), so centred by its box it looks off to the left.
-          It is nudged right by half the difference between its box centre and its centre of weight. */}
-      <div style={{ transform: "translateX(4.2%)" }}><FrejasMark size={mark} /></div>
-      <FrejasWordmark height={word} />
-    </div>
+    // The F is heavier on its left side (the stem), so centred by its box it looks off to the left.
+    // It is nudged right by half the difference between its box centre and its centre of weight.
+    <div style={{ transform: "translateX(4.2%)" }}><FrejasMark size={mark} onRaspberry={onRaspberry} /></div>
   );
 }

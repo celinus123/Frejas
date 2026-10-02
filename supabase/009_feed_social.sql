@@ -1,20 +1,20 @@
 -- 009 · the feed gets reactions with a choice of emoji, and short comments.
+-- Written so that it only ADDS things (no drop, no revoke): rules that already
+-- exist are left in place and the new ones are added beside them.
 -- They work on two kinds of post: a check-in in a challenge, and a "day card"
 -- (the habits someone shares with friends that they ticked on a given day).
 
 -- ---------------------------------------------------------------- check-ins
 -- one reaction per person per check-in; which emoji is a choice of five
 alter table public.reactions add column if not exists emoji text not null default '❤️';
-alter table public.reactions drop constraint if exists reactions_emoji_check;
 alter table public.reactions add constraint reactions_emoji_check check (emoji in ('❤️', '😍', '😊', '👏', '⚡'));
-drop policy if exists "reactions: change own" on public.reactions;
 create policy "reactions: change own" on public.reactions
   for update to authenticated using (user_id = auth.uid()) with check (user_id = auth.uid());
 grant update (emoji) on public.reactions to authenticated;
 
 -- comments are short, like a note on a story
-alter table public.comments drop constraint if exists comments_body_check;
-alter table public.comments add constraint comments_body_check check (char_length(body) between 1 and 120);
+-- (the older, longer limit stays; this one is added and is the one that bites)
+alter table public.comments add constraint comments_body_max_120 check (char_length(body) <= 120);
 
 -- ---------------------------------------------------------------- day cards
 -- A day card is identified by whose habits (owner_id) and which day.
@@ -71,20 +71,22 @@ grant select, insert, delete on public.day_comments  to authenticated;
 grant all on public.day_reactions, public.day_comments to service_role;
 
 -- the owner of a check-in can also remove comments written on it
-drop policy if exists "comments: delete own" on public.comments;
-create policy "comments: delete own or on your check-in" on public.comments
+-- (added beside "comments: delete own"; either rule is enough)
+create policy "comments: delete on your check-in" on public.comments
   for delete to authenticated
-  using (user_id = auth.uid() or exists (select 1 from public.check_ins ci where ci.id = check_in_id and ci.user_id = auth.uid()));
+  using (exists (select 1 from public.check_ins ci where ci.id = check_in_id and ci.user_id = auth.uid()));
 
 -- Names of people who reacted or commented on a day card you can see.
 -- (They are friends of the card's owner, not necessarily of you, so the
--- normal profile rule would hide their name.) Returns nothing for anyone else.
+-- normal profile rule would hide their name.) Returns nothing for anyone else,
+-- including someone who isn't signed in: every branch below needs auth.uid().
 create or replace function public.post_people(p_ids uuid[])
 returns table (id uuid, display_name text, avatar_path text)
 language sql stable security definer set search_path = '' as $$
   select p.id, p.display_name, p.avatar_path
   from public.profiles p
   where p.id = any (p_ids)
+    and auth.uid() is not null
     and (p.id = auth.uid()
       or public.shares_challenge(p.id)
       or exists (select 1 from public.day_comments c
@@ -92,7 +94,6 @@ language sql stable security definer set search_path = '' as $$
       or exists (select 1 from public.day_reactions r
                  where r.user_id = p.id and (r.owner_id = auth.uid() or public.shares_challenge(r.owner_id))));
 $$;
-revoke execute on function public.post_people(uuid[]) from public, anon;
 grant execute on function public.post_people(uuid[]) to authenticated;
 
 -- live updates in the feed (row security still decides who gets what)

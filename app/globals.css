@@ -207,3 +207,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .ci-main { flex: 1; min-width: 0; padding: 12px 12px 8px 14px; display: flex; flex-direction: column; gap: 6px; }
 .ci-photo { width: 38%; max-width: 150px; flex-shrink: 0; border: 0; padding: 0; position: relative; background: var(--soft); min-height: 118px; }
 .ci-photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---------------------------------------------------------------- the first screens (welcome, email, code, name): raspberry, in light and dark mode alike */
+html.onb-page, html.onb-page body { background: #b01e57; }
+html.onb-page .statusbar-cover { background: #b01e57; }
+.onb { --ink: #fff7e6; --ink-2: #ffe3ea; --primary: #4a1230; --on-primary: #ffffff; --primary-l: #e9a9c0; --surface: #ffffff; --soft: #fedfe2; --soft-l: #feeff0; --accent: #b01e57; --accent-bg: #fff7e6;
+  --shadow: 0 0 0 1px rgba(46, 11, 25, 0.1), 0 2px 8px rgba(46, 11, 25, 0.16); --onb-link: #ffffff; color: var(--ink); }
+/* white and pink surfaces on the raspberry page keep dark text */
+.onb .field, .onb .icon-btn, .onb .soft, .onb .tag { --ink: #2e0b19; --ink-2: #75606a; color: #2e0b19; }
+.onb .field:focus-within { box-shadow: inset 0 0 0 2.5px #4a1230; }
+.onb button:focus-visible, .onb a:focus-visible, .onb input:focus-visible { outline-color: #ffffff; }
+.onb .btn:disabled { opacity: .75; }

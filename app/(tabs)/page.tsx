@@ -135,7 +135,14 @@ export default function Today() {
     load();
   }
 
+  // Ticking one habit of a pair ticks the other too (and unticking unticks it), challenge check-in included.
   async function toggle(h: Habit) {
+    const was = logs.some((l) => l.habit_id === h.id && l.log_date === sel);
+    await toggleOne(h);
+    const twin = h.linked_habit_id ? allHabits?.find((x) => x.id === h.linked_habit_id) : undefined;
+    if (twin && logs.some((l) => l.habit_id === twin.id && l.log_date === sel) === was) await toggleOne(twin);
+  }
+  async function toggleOne(h: Habit) {
     if (!userId) return;
     const day = sel;
     const existing = logs.find((l) => l.habit_id === h.id && l.log_date === day);

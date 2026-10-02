@@ -60,6 +60,12 @@ function Welcome() {
     else if (step !== "name") router.replace(next);
   }, [session, profile, step, router, next]);
 
+  // these screens are raspberry all the way out to the edges of the phone
+  useEffect(() => {
+    document.documentElement.classList.add("onb-page");
+    return () => document.documentElement.classList.remove("onb-page");
+  }, []);
+
   useEffect(() => {
     if (resendIn <= 0) return;
     const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
@@ -111,14 +117,14 @@ function Welcome() {
   }
 
   const wrap = (children: React.ReactNode) => (
-    <main className="page" style={{ minHeight: "100dvh", paddingBottom: "calc(env(safe-area-inset-bottom) + 30px)", gap: 16 }}>{children}</main>
+    <main className="page onb" style={{ minHeight: "100dvh", paddingBottom: "calc(env(safe-area-inset-bottom) + 30px)", gap: 16 }}>{children}</main>
   );
 
   if (step === "start") return wrap(
     <>
       {inv ? (
         <>
-        <div style={{ marginTop: 30, display: "flex", justifyContent: "center" }}><FrejasLockup mark={64} word={22} /></div>
+        <div style={{ marginTop: 30, display: "flex", justifyContent: "center" }}><FrejasLockup mark={64} onRaspberry /></div>
         <div className="soft" style={{ marginTop: 10, padding: 20, borderRadius: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, textAlign: "center" }}>
           <Avatars people={inv.member_names.map((n) => ({ name: n }))} size={44} ring="var(--soft)" />
           <div className="muted" style={{ fontSize: 14 }}><b style={{ color: "var(--ink)" }}>{inv.member_names[0]}</b> invited you to</div>
@@ -129,7 +135,7 @@ function Welcome() {
         </>
       ) : (
         <div style={{ marginTop: 70, display: "flex", flexDirection: "column", alignItems: "center", gap: 26, textAlign: "center" }}>
-          <FrejasLockup mark={112} word={34} />
+          <FrejasLockup mark={112} onRaspberry />
           <h1 className="h1" style={{ fontSize: 36 }}>Small habits,<br />better together.</h1>
           <p className="muted" style={{ fontSize: 15, lineHeight: 1.5, maxWidth: 280, margin: 0 }}>Keep your own routines and start friendly challenges with friends.</p>
         </div>
@@ -184,10 +190,10 @@ function Welcome() {
       </label>
       {err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700, textAlign: "center" }}>{err}</div>}
       <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>{busy ? "Checking…" : "Signs you in as soon as all six digits are in."}</div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginTop: 4 }}>
         {resendIn > 0 ? <span className="muted">Resend code in 0:{String(resendIn).padStart(2, "0")}</span>
-          : <button onClick={sendCode} style={{ border: 0, background: "none", fontWeight: 800, color: "var(--primary)", padding: 0 }}>Send a new code</button>}
-        <button onClick={() => setStep("email")} style={{ border: 0, background: "none", fontWeight: 800, color: "var(--primary)", padding: 0 }}>Change email</button>
+          : <button onClick={sendCode} style={{ border: 0, background: "none", fontWeight: 800, color: "var(--onb-link, var(--primary))", padding: 0, textDecoration: "underline", textUnderlineOffset: 3 }}>Send a new code</button>}
+        <button onClick={() => setStep("email")} style={{ border: 0, background: "none", fontWeight: 800, color: "var(--onb-link, var(--primary))", padding: 0, textDecoration: "underline", textUnderlineOffset: 3 }}>Change email</button>
       </div>
     </>,
   );

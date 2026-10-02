@@ -55,6 +55,27 @@ export async function unlogHabit(logId: string) {
   if (error) throw error;
 }
 
+/** Removes the tick a habit has on a given day, if there is one. */
+export async function unlogHabitOn(habitId: string, date: string) {
+  const { data } = await sb().from("habit_logs").select("id").eq("habit_id", habitId).eq("log_date", date).maybeSingle();
+  if (data) await unlogHabit((data as { id: string }).id);
+}
+
+/** Two habits kept as a pair ("tick them together"). Any earlier pair either of them had is ended first. */
+export async function pairHabits(a: Pick<Habit, "id" | "linked_habit_id">, b: Pick<Habit, "id" | "linked_habit_id">) {
+  for (const [h, other] of [[a, b], [b, a]] as const)
+    if (h.linked_habit_id && h.linked_habit_id !== other.id) await sb().from("habits").update({ linked_habit_id: null }).eq("id", h.linked_habit_id);
+  const r1 = await sb().from("habits").update({ linked_habit_id: b.id }).eq("id", a.id);
+  if (r1.error) throw r1.error;
+  const r2 = await sb().from("habits").update({ linked_habit_id: a.id }).eq("id", b.id);
+  if (r2.error) throw r2.error;
+}
+export async function unpairHabit(h: Pick<Habit, "id" | "linked_habit_id">) {
+  if (h.linked_habit_id) await sb().from("habits").update({ linked_habit_id: null }).eq("id", h.linked_habit_id);
+  const { error } = await sb().from("habits").update({ linked_habit_id: null }).eq("id", h.id);
+  if (error) throw error;
+}
+
 export interface MyChallenge { challenge: Challenge; me: Member }
 
 export async function myChallenges(uid: string): Promise<MyChallenge[]> {

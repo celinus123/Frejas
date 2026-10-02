@@ -7,7 +7,7 @@ import { Ring } from "@/components/Ring";
 import { BackBar } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { addDays, formatShort, frequencyLabel, habitStart, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
-import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
+import { loadHabits, loadLogs, logHabit, unlogHabit, unlogHabitOn } from "@/lib/data";
 import { habitFacts, habitInsights } from "@/lib/insights";
 import type { Habit, HabitLog } from "@/lib/types";
 
@@ -63,8 +63,9 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
   async function toggleDay(d: string) {
     if (!userId || d > t) return;
     const ex = logs.find((l) => l.log_date === d);
-    if (ex) { setLogs((ls) => ls.filter((l) => l.id !== ex.id)); await unlogHabit(ex.id); }
-    else { const l = await logHabit(habit!.id, userId, d); setLogs((ls) => [...ls, l]); }
+    const twin = habit!.linked_habit_id;   // its pair is ticked and unticked with it
+    if (ex) { setLogs((ls) => ls.filter((l) => l.id !== ex.id)); await unlogHabit(ex.id); if (twin) await unlogHabitOn(twin, d); }
+    else { const l = await logHabit(habit!.id, userId, d); setLogs((ls) => [...ls, l]); if (twin) await logHabit(twin, userId, d).catch(() => {}); }
   }
 
   const facts = habitFacts(habit, logs.map((l) => l.log_date), t);
@@ -92,6 +93,11 @@ export default function HabitDetail({ params }: { params: Promise<{ id: string }
             <Icon name={habit.visibility === "friends" ? "users" : "lock"} size={13} />{habit.visibility === "friends" ? "Friends" : "Private"}
           </span>
           <span className="tag">Since {formatShort(habitStart(habit))}</span>
+          {habit.linked_habit_id && mine.habits.find((h) => h.id === habit.linked_habit_id) && (
+            <Link href={`/habits/${habit.linked_habit_id}`} className="tag" style={{ display: "flex", gap: 4, alignItems: "center", color: "inherit", textDecoration: "none", background: "var(--accent-bg)" }}>
+              <Icon name="link" size={13} />Ticked with {mine.habits.find((h) => h.id === habit.linked_habit_id)!.name}
+            </Link>
+          )}
           {habit.archived_at && <span className="tag">Archived</span>}
         </div>
       </div>

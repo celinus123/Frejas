@@ -11,7 +11,7 @@ import Link from "next/link";
 import { addDays, bonusSessions, dayFraction, iso, formatLong, isFlexible, isScheduledOn, monthDays, parse, startOfWeek, today, weekday } from "@/lib/dates";
 import { habitRates } from "@/lib/insights";
 import { D } from "@/lib/design";
-import { loadHabits, loadLogs, logHabit, unlogHabit } from "@/lib/data";
+import { loadHabits, loadLogs, logHabit, unlogHabit, unlogHabitOn } from "@/lib/data";
 import type { Habit, HabitLog } from "@/lib/types";
 
 type Period = "Week" | "Month" | "Year";
@@ -75,8 +75,12 @@ export default function Stats() {
   async function toggle(h: Habit, d: string) {
     if (!userId) return;
     const ex = logs.find((l) => l.habit_id === h.id && l.log_date === d);
-    if (ex) { setLogs((ls) => ls.filter((l) => l.id !== ex.id)); await unlogHabit(ex.id); }
-    else { const l = await logHabit(h.id, userId, d); setLogs((ls) => [...ls, l]); }
+    const twin = h.linked_habit_id;   // its pair is ticked and unticked with it
+    if (ex) { setLogs((ls) => ls.filter((l) => l.id !== ex.id && !(twin && l.habit_id === twin && l.log_date === d))); await unlogHabit(ex.id); if (twin) await unlogHabitOn(twin, d); }
+    else {
+      const l = await logHabit(h.id, userId, d); const more = twin ? await logHabit(twin, userId, d).then((x) => [x]).catch(() => []) : [];
+      setLogs((ls) => [...ls.filter((x) => !more.some((m) => m.id === x.id)), l, ...more]);
+    }
   }
 
   const tile = (bg: string, icon: React.ReactNode) => <div style={{ width: 38, height: 38, borderRadius: 14, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>;
