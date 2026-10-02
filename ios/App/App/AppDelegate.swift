@@ -52,13 +52,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-/// The screen that hosts the web view. It only adjusts how scrolling looks and feels.
+/// The screen that hosts the web view. It only hides the scroll line.
+/// How scrolling feels is left to the system: setting the deceleration rate here (build 1.0 (2)) made it
+/// noticeably less smooth than the same page in Safari.
 class MainViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         guard let scroll = webView?.scrollView else { return }
         scroll.showsVerticalScrollIndicator = false
         scroll.showsHorizontalScrollIndicator = false
-        scroll.decelerationRate = .normal
     }
 }
