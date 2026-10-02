@@ -120,6 +120,7 @@ export default function Settings() {
       <div className="card group">
         <Link href="/privacy" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="shield" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Privacy policy</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
         <Link href="/terms" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="edit" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Terms</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+        <Link href="/support" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="comment" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Help and questions</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
         <a href="mailto:hello@frejas.app" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="mail" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Contact us</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>hello@frejas.app</div></div><Icon name="right" size={16} color="var(--ink-2)" /></a>
       </div>
 

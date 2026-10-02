@@ -1,21 +1,16 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { FrejasMark } from "@/components/Logo";
+import { SiteNav } from "./SiteNav";
 
-/** Where the website lives. It is "/site" while it is a proposal, and becomes "" when it takes over frejas.app. */
-export const SITE = "/site";
+/** The app's page in the App Store. Set it when the app is approved (https://apps.apple.com/app/id6818469944): the "coming soon" notes turn into buttons. */
+export const APP_STORE_URL: string | null = null;
 
 export function SiteHead({ on = "paper" }: { on?: "paper" | "raspberry" }) {
-  const dark = on === "raspberry";
   return (
     <header className="s-wrap s-head">
-      <Link href={SITE || "/"} aria-label="Frejas, to the start page" style={{ display: "block" }}><FrejasMark size={46} onRaspberry={dark} /></Link>
-      <nav className="s-nav" aria-label="Main">
-        <Link className="wide" href={`${SITE}#features`}>What it does</Link>
-        <Link className="wide" href={`${SITE}/support`}>Support</Link>
-        <Link href="/welcome">Log in</Link>
-        <Link href="/welcome" className={`s-btn sm ${dark ? "cream" : "cta"}`}>Get started</Link>
-      </nav>
+      <Link href="/" aria-label="Frejas, to the start page" style={{ display: "block" }}><FrejasMark size={46} onRaspberry={on === "raspberry"} /></Link>
+      <SiteNav />
     </header>
   );
 }
@@ -28,10 +23,11 @@ export function SiteFoot() {
         <span>Frejas · habits with friends<br />© 2026 Gabriella Blanche, Nice, France</span>
       </div>
       <nav aria-label="More">
-        <Link href={`${SITE}/support`}>Support</Link>
-        <Link href={`${SITE}/privacy`}>Privacy</Link>
-        <Link href={`${SITE}/terms`}>Terms</Link>
+        <Link href="/support">Support</Link>
+        <Link href="/privacy">Privacy</Link>
+        <Link href="/terms">Terms</Link>
         <a href="mailto:hello@frejas.app">hello@frejas.app</a>
+        <Link href="/welcome" className="quiet">Log in</Link>
       </nav>
     </footer>
   );

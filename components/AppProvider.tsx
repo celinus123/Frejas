@@ -9,6 +9,7 @@ import type { Profile } from "@/lib/types";
 interface Toast { text: ReactNode; action?: { label: string; onClick: () => void }; undo?: () => void }
 interface Ctx {
   session: Session | null;
+  ready: boolean;                    // false until we know whether someone is signed in
   userId: string | null;
   profile: Profile | null;
   refreshProfile: () => Promise<void>;
@@ -25,9 +26,11 @@ export const useApp = () => {
   return c;
 };
 
-const PUBLIC = ["/welcome", "/join", "/add", "/privacy", "/terms", "/site"];
+const PUBLIC = ["/welcome", "/join", "/add", "/privacy", "/terms", "/support"];
 // the website: shown straight away, without waiting to find out whether someone is signed in
-const SITE = ["/site"];
+const SITE = ["/privacy", "/terms", "/support"];
+// "/" is the website for a visitor and the app for someone signed in; components/HomeGate decides
+const open = (path: string) => path === "/" || PUBLIC.some((p) => path.startsWith(p));
 
 function applyTheme(t: Profile["theme"]) {
   const el = document.documentElement;
@@ -116,7 +119,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Route guard: signed-out users go to /welcome, new users pick a name first.
   useEffect(() => {
     if (!ready) return;
-    const isPublic = PUBLIC.some((p) => path.startsWith(p));
+    const isPublic = open(path);
     if (!session && !isPublic) router.replace(`/welcome${window.location.hash.includes("error") ? window.location.hash : ""}`);
     else if (session && profile && !profile.display_name && !path.startsWith("/welcome")) {
       const invite = path.startsWith("/join/") ? `&invite=${path.split("/")[2]}` : path.startsWith("/add/") ? `&friend=${path.split("/")[2]}` : "";
@@ -131,17 +134,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<Ctx>(() => ({
-    session,
+    session, ready,
     userId: session?.user.id ?? null,
     profile,
     refreshProfile: async () => { if (session) await loadProfile(session.user.id); },
     setTheme: (t) => { applyTheme(t); setProfile((p) => (p ? { ...p, theme: t } : p)); },
     toast,
     reportsOpen, refreshReports,
-  }), [session, profile, loadProfile, toast, reportsOpen, refreshReports]);
+  }), [session, ready, profile, loadProfile, toast, reportsOpen, refreshReports]);
 
-  const isPublic = PUBLIC.some((p) => path.startsWith(p));
-  const blocked = !SITE.some((p) => path.startsWith(p)) && (!ready || (!session && !isPublic));
+  const blocked = path !== "/" && !SITE.some((p) => path.startsWith(p)) && (!ready || (!session && !open(path)));
 
   // has the page scrolled? (only flips when crossing the top, so it costs nothing while scrolling)
   const [scrolled, setScrolled] = useState(false);

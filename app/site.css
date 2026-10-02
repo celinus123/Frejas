@@ -1,7 +1,13 @@
 /* The website: what a visitor to frejas.app sees. Wide, light, and in the app's own colours and type.
    Everything is scoped to .site so the app's styles are untouched. */
-html:has(.site), html:has(.site) body { background: #fff; scrollbar-width: auto; }
-html:has(.site)::-webkit-scrollbar, html:has(.site) body::-webkit-scrollbar { display: initial; width: initial; height: initial; }
+html:not(.has-app):has(.site), html:not(.has-app):has(.site) body { background: #fff; scrollbar-width: auto; }
+html:not(.has-app):has(.site)::-webkit-scrollbar, html:not(.has-app):has(.site) body::-webkit-scrollbar { display: initial; width: initial; height: initial; }
+/* the text pages are also read from inside the app (Settings): there they keep the app's hidden scroll line but stay light */
+html.has-app:has(.s-doc), html.has-app:has(.s-doc) body { background: #fff; }
+
+/* frejas.app: the website for a visitor, the app's loading state for someone on their way in (see components/HomeGate) */
+html.has-app .home-landing { display: none; }
+html:not(.has-app) .home-wait { display: none; }
 
 .site {
   --bg: #ffffff; --surface: #ffffff; --soft: #fedfe2; --soft-l: #feeff0; --primary: #4a1230; --on-primary: #ffffff;
@@ -34,7 +40,8 @@ html:has(.site)::-webkit-scrollbar, html:has(.site) body::-webkit-scrollbar { di
 .s-hero h1 { font-size: 68px; }
 .s-hero p.lead { font-size: 20px; line-height: 1.5; margin: 22px 0 30px; max-width: 30em; }
 .s-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-.s-soon { display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 20px; border-radius: 26px; font-size: 15px; font-weight: 800; }
+.s-soon { display: inline-flex; align-items: center; gap: 9px; height: 56px; padding: 0 26px; border-radius: 28px; font-size: 16.5px; font-weight: 800; }
+.s-last .s-soon { background: rgba(255, 247, 230, 0.14); }
 .s-facts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 26px; font-size: 14.5px; font-weight: 700; }
 .s-facts span { display: inline-flex; align-items: center; gap: 6px; }
 .s-stage { position: relative; display: flex; justify-content: center; padding: 10px 0 0; }
@@ -90,6 +97,7 @@ html:has(.site)::-webkit-scrollbar, html:has(.site) body::-webkit-scrollbar { di
 .s-foot { padding: 44px 0 56px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 20px; font-size: 14.5px; color: var(--ink-2); }
 .s-foot nav { display: flex; flex-wrap: wrap; gap: 8px 24px; font-weight: 700; color: var(--ink); }
 .s-foot nav a { text-decoration: none; } .s-foot nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
+.s-foot nav a.quiet { color: var(--ink-2); font-weight: 600; }
 
 /* ---------- text pages (support, privacy, terms) */
 .s-doc { max-width: 720px; margin: 0 auto; padding: 40px 24px 96px; }
@@ -120,6 +128,7 @@ html:has(.site)::-webkit-scrollbar, html:has(.site) body::-webkit-scrollbar { di
   .s-hero-grid { grid-template-columns: minmax(0, 1fr); gap: 36px; padding-top: 16px; }
   .s-hero h1 { font-size: 42px; }
   .s-hero p.lead { font-size: 18px; margin: 16px 0 24px; }
+  .s-soon { height: 52px; padding: 0 20px; font-size: 15px; white-space: nowrap; }
   .s-hero .s-phone { width: 260px; margin-bottom: -120px; }
   .s-hero .s-phone.back { display: none; }
   .s-hero .s-stage { padding-right: 0; }

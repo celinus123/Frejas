@@ -8,10 +8,10 @@ const FAQ: [string, React.ReactNode][] = [
   ["Can I get a copy of my data?", <p key="a">Yes. In <b>Settings</b>, choose <b>Download my data</b>.</p>],
   ["The sign-in code never arrived", <p key="a">The email with the code can land in spam, so look there first. You can ask for a new one after 45 seconds. If it still doesn&apos;t come, write to us and we will help.</p>],
   ["Is Frejas free?", <p key="a">Yes. Frejas is free and has no ads.</p>],
-  ["Which phones does it work on?", <p key="a">The iPhone app is on its way to the App Store. Until then, and on any other phone or computer, Frejas works in the browser at frejas.app.</p>],
+  ["Which phones does it work on?", <p key="a">The iPhone app is on its way to the App Store. Until then, and on any other phone or computer, Frejas works in the browser: use <b>Log in</b> at the bottom of this page.</p>],
 ];
 
-export const metadata = { title: "Support · Frejas" };
+export const metadata = { title: "Support · Frejas", description: "Help with Frejas: common questions, how to report or block, how to delete your account, and how to reach us.", alternates: { canonical: "https://frejas.app/support" } };
 
 export default function Support() {
   return (

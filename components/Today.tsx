@@ -21,7 +21,7 @@ import type { Habit, HabitLog } from "@/lib/types";
 
 interface ChallengeCard extends MyChallenge { mine: number; pct: number; done: number; target: number; rank: number; of: number; total: number; people: { name: string; path: string | null }[] }
 
-export default function Today() {
+export function Today() {
   const { userId, profile, toast } = useApp();
   const [allHabits, setHabits] = useState<Habit[] | null>(null);
   const [cat, setCat] = useState<string | null>(null);

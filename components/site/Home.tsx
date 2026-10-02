@@ -1,10 +1,16 @@
-import Link from "next/link";
 import { Icon } from "@/components/Icon";
 import { FrejasMark } from "@/components/Logo";
-import { SiteFoot, SiteHead } from "@/components/site/SiteChrome";
+import { APP_STORE_URL, SiteFoot, SiteHead } from "@/components/site/SiteChrome";
 
 function Phone({ src, alt }: { src: string; alt: string }) {
-  return <div className="s-phone"><img src={`/site/${src}.jpg`} alt={alt} width={390} height={844} /></div>;
+  return <div className="s-phone"><img src={`/web/${src}.jpg`} alt={alt} width={390} height={844} /></div>;
+}
+
+/** The way to the app: a button once it is in the App Store, a note until then. */
+function GetApp({ tone }: { tone: "cream" | "cta" }) {
+  return APP_STORE_URL
+    ? <a href={APP_STORE_URL} className={`s-btn ${tone}`}>Get Frejas for iPhone</a>
+    : <span className="s-soon"><Icon name="clock" size={18} />Coming soon to the App Store</span>;
 }
 
 function Feature({ flip, tile, shot, alt, eyebrow, title, text, ticks }: { flip?: boolean; tile: "pink" | "cream" | "rose"; shot: string; alt: string; eyebrow: string; title: string; text: string; ticks: string[] }) {
@@ -21,20 +27,17 @@ function Feature({ flip, tile, shot, alt, eyebrow, title, text, ticks }: { flip?
   );
 }
 
-export default async function Home({ searchParams }: { searchParams: Promise<{ v?: string }> }) {
-  const b = (await searchParams).v === "b";   // two proposals for the top of the page: ?v=b is the light one
+/** frejas.app for a visitor: what Frejas is, what it does, and how to get it. */
+export function Home() {
   return (
     <>
-      <section className={b ? "s-hero b" : "s-hero a"}>
-        <SiteHead on={b ? "paper" : "raspberry"} />
+      <section className="s-hero a">
+        <SiteHead on="raspberry" />
         <div className="s-wrap s-hero-grid">
           <div>
             <h1 className="s-display">Habits are easier with <em>friends.</em></h1>
             <p className="lead">Frejas keeps your habits in one calm place. Turn any of them into a challenge, on your own or with friends, and keep each other going.</p>
-            <div className="s-actions">
-              <Link href="/welcome" className={`s-btn ${b ? "cta" : "cream"}`}>Start for free</Link>
-              <span className="s-soon"><Icon name="clock" size={18} />Coming soon to iPhone</span>
-            </div>
+            <div className="s-actions"><GetApp tone="cream" /></div>
             <div className="s-facts">
               <span><Icon name="check" size={17} stroke={2.6} />Free</span>
               <span><Icon name="check" size={17} stroke={2.6} />No ads</span>
@@ -42,7 +45,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             </div>
           </div>
           <div className="s-stage">
-            <div className="s-phone back" aria-hidden="true"><img src="/site/challenge.jpg" alt="" width={390} height={844} /></div>
+            <div className="s-phone back" aria-hidden="true"><img src="/web/challenge.jpg" alt="" width={390} height={844} /></div>
             <Phone src="today" alt="The Today screen in Frejas: this week, today's progress and the habits to tick off" />
           </div>
         </div>
@@ -90,7 +93,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ v
             <FrejasMark size={64} />
             <h2 className="s-display">Start with one habit.</h2>
             <p>Frejas is free. It takes a minute to set up, and you can bring your friends in later.</p>
-            <Link href="/welcome" className="s-btn cta">Start for free</Link>
+            <GetApp tone="cta" />
           </div>
         </div>
       </section>

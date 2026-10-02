@@ -7,6 +7,7 @@ import "./globals.css";
 
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://frejas.app"),
   title: "Frejas",
   description: "Small habits, better together.",
   appleWebApp: { capable: true, title: "Frejas", statusBarStyle: "default" },
@@ -25,7 +26,12 @@ export const viewport: Viewport = {
 };
 
 // Applies the saved theme before first paint so there is no flash.
-const themeScript = `try{var t=localStorage.getItem('orbit-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
+// Also marks the page when someone is on their way into the app (signed in, inside the iPhone app, or opened from a
+// home screen), so that frejas.app shows them the app's loading state and never a glimpse of the website.
+const themeScript = `try{var d=document.documentElement,t=localStorage.getItem('orbit-theme');if(t==='light'||t==='dark')d.setAttribute('data-theme',t);`
+  + `var a=false;for(var i=0;i<localStorage.length;i++){if(/^sb-.*-auth-token$/.test(localStorage.key(i)||'')){a=true;break}}`
+  + `if(!a)a=!!(window.Capacitor&&window.Capacitor.isNativePlatform&&window.Capacitor.isNativePlatform())||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true;`
+  + `if(a)d.classList.add('has-app')}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

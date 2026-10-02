@@ -11,6 +11,13 @@ const securityHeaders = [
 const config: NextConfig = {
   // lets an open app notice that a newer version has been published
   env: { NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev" },
+  // the website proposal lived under /site while it was being reviewed
+  async redirects() {
+    return [
+      { source: "/site", destination: "/", permanent: false },
+      { source: "/site/:page", destination: "/:page", permanent: false },
+    ];
+  },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
