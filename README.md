@@ -87,6 +87,10 @@ updates the apps too. Only changes to the shell itself (icons, permissions, new 
 
 After changing native settings or adding a plugin: `npx cap sync`.
 
+### Levels and limits
+
+`supabase/019_levels.sql`. Three levels: **guest** (no account), **free** (an account) and **plus** (paid). What each has room for is a row in `plan_limits`: habits of your own, challenges you started, and challenges others started that you are in. Guest and free start at 5, 1 and 2; plus has no limits. To change a number: `update plan_limits set habits = 7 where level = 'free';`. Habits that came with a challenge don't count, solo challenges and drafts do, and nothing anyone already has is taken away. The database refuses anything over the limit; the app asks `my_limits()` first and shows a notice instead of a form. To give someone the paid level by hand: `insert into user_plans (user_id, note) values ('<their id>', 'why');`.
+
 ### Notifications
 
 - From other people (invitation, request to join, comment, new friend): the app calls `/api/notify`, which looks the event up in

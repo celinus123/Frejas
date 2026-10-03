@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { GuestCard, SaveAccountSheet } from "@/components/SaveAccount";
+import { useLimits, type Room } from "@/lib/limits";
 import { Icon } from "@/components/Icon";
 import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
@@ -22,6 +23,7 @@ export default function Settings() {
   const router = useRouter();
   const { guest, userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
   const [saveOpen, setSaveOpen] = useState(false);       // a guest adding their email
+  const { limits } = useLimits(userId);                  // what this level has room for
   const [leaveOpen, setLeaveOpen] = useState(false);     // a guest about to log in to another account
   const [name, setName] = useState(profile?.display_name ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -155,6 +157,22 @@ export default function Settings() {
         </div>
       </div>
       {guest && <GuestCard onSave={() => setSaveOpen(true)} />}
+      {limits && (
+        <>
+          <div className="label">Your level</div>
+          <div className="card" style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ fontSize: "var(--t-title)", fontWeight: 800 }}>{limits.level === "plus" ? "No limits" : "Free"}</div>
+            {limits.level === "plus"
+              ? <div className="muted" style={{ fontSize: "var(--t-sub)", lineHeight: 1.45 }}>This account can have as many habits and challenges as you like.</div>
+              : ([["Habits of your own", limits.habits], ["Challenges you started", limits.own], ["Challenges you joined", limits.joined]] as [string, Room][]).map(([label, r]) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 14 }}>
+                  <span className="muted">{label}</span><span style={{ fontWeight: 700 }}>{r.max === null ? r.used : `${r.used} of ${r.max}`}</span>
+                </div>
+              ))}
+            {limits.level !== "plus" && <div className="muted" style={{ fontSize: "var(--t-sub)", lineHeight: 1.45 }}>More room is coming with a paid level.</div>}
+          </div>
+        </>
+      )}
 
       <div className="label">Appearance</div>
       <div className="card group"><div className="row"><Icon name="moon" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Theme</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Auto follows your phone</div></div>{seg}</div></div>

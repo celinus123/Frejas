@@ -12,6 +12,8 @@ import { forgetInvite, saveInvite } from "@/lib/savedInvites";
 import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import { useGuestStart } from "@/lib/guest";
+import { LimitCard } from "@/components/LimitNotice";
+import { full as noRoom, useLimits } from "@/lib/limits";
 import { formatShort, today } from "@/lib/dates";
 import { invitePreview, loadHabits, type InvitePreview } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
@@ -25,6 +27,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
   const router = useRouter();
   const { session, userId, profile } = useApp();
   const guest = useGuestStart();
+  const { limits } = useLimits(userId);   // is there room on your level for one more challenge that someone else started?
   const [inv, setInv] = useState<Invite | null | undefined>(undefined);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitId, setHabitId] = useState("new");
@@ -172,7 +175,15 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
           <Link href={`/welcome?invite=${token}`} className="btn btn-soft">I already have an account</Link>
           {guest.ok && <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", lineHeight: 1.5, margin: 0 }}>No account needed to join. By continuing you agree to the <a href="/terms" style={{ color: "var(--ink)" }}>Terms</a> and <a href="/privacy" style={{ color: "var(--ink)" }}>Privacy Policy</a>.</p>}
         </>
-      ) : !profile?.display_name ? null : (
+      ) : !profile?.display_name ? null : limits && noRoom(limits.joined) ? (
+        <>
+          <LimitCard kind="joined" max={limits.joined.max!} />
+          <div style={{ flex: 1 }} />
+          <Link href="/challenges" className="btn btn-primary">Go to my challenges</Link>
+          {/* kept under Challenges → Invitations, so it is there when there is room */}
+          <button className="btn btn-soft" onClick={() => { saveInvite(token); router.replace("/challenges"); }}>Keep the invitation for later</button>
+        </>
+      ) : (
         <>
           {habits.length > 0 && (
             <>

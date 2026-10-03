@@ -1,6 +1,8 @@
 "use client";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { LimitPage } from "@/components/LimitNotice";
+import { full, useLimits } from "@/lib/limits";
 import { useApp } from "@/components/AppProvider";
 import { Icon } from "@/components/Icon";
 import { Avatar, Sheet } from "@/components/ui";
@@ -494,6 +496,16 @@ function NewChallenge() {
   );
 }
 
+// A new challenge needs room on your level; a draft you already have can always be opened.
+function Gate() {
+  const draft = useSearchParams().get("draft");
+  const { userId } = useApp();
+  const { limits, loaded } = useLimits(userId);
+  if (!draft && !loaded) return <main className="page"><div className="skeleton" style={{ height: 320 }} /></main>;
+  if (!draft && limits && full(limits.own)) return <LimitPage kind="own" max={limits.own.max!} />;
+  return <NewChallenge />;
+}
+
 export default function Page() {
-  return <Suspense><NewChallenge /></Suspense>;
+  return <Suspense><Gate /></Suspense>;
 }
