@@ -12,6 +12,7 @@ import { forgetInvite, saveInvite } from "@/lib/savedInvites";
 import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import { useGuestStart } from "@/lib/guest";
+import { track } from "@/lib/analytics";
 import { LimitCard } from "@/components/LimitNotice";
 import { full as noRoom, useLimits } from "@/lib/limits";
 import { formatShort, today } from "@/lib/dates";
@@ -98,6 +99,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
         throw error;
       }
       forgetInvite(token);
+      track("challenge_joined", { via: "link", asked: data === "requested", own_habit: habitId !== "new" });
       if (data === "requested") { notify({ type: "request", challenge_id: inv.challenge_id }); setRequested(true); setBusy(false); return; }
       router.replace(`/challenges/${inv.challenge_id}`);
     } catch (e) {

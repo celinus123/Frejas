@@ -4,6 +4,7 @@ import type { Challenge, CheckIn, Habit, HabitLog, Member } from "./types";
 import { iso, today } from "./dates";
 import { nativeShare } from "./native";
 import { blockedIds } from "./safety";
+import { track } from "./analytics";
 
 const sb = () => supabase();
 
@@ -44,7 +45,7 @@ export async function logHabit(habitId: string, uid: string, date: string): Prom
     .upsert({ habit_id: habitId, user_id: uid, log_date: date }, { onConflict: "habit_id,log_date", ignoreDuplicates: true })
     .select().maybeSingle();
   if (error) throw error;
-  if (data) return data as HabitLog;
+  if (data) { track("habit_ticked", { today: date === today() }); return data as HabitLog; }
   const { data: existing, error: e2 } = await sb().from("habit_logs").select("*").eq("habit_id", habitId).eq("log_date", date).single();
   if (e2) throw e2;
   return existing as HabitLog;
@@ -54,6 +55,7 @@ export async function unlogHabit(logId: string) {
   await sb().from("check_ins").delete().eq("habit_log_id", logId);
   const { error } = await sb().from("habit_logs").delete().eq("id", logId);
   if (error) throw error;
+  track("habit_unticked");
 }
 
 // ---------------------------------------------------------------- a habit shown to chosen friends only
@@ -258,6 +260,7 @@ export function inviteUrl(token: string) {
 }
 
 export async function shareLink(url: string, title: string, text = `Join my challenge "${title}"`): Promise<"shared" | "copied"> {
+  track("link_shared", { kind: url.includes("/add/") ? "friend" : "challenge" });
   if (await nativeShare({ title, text, url })) return "shared";
   if (navigator.share) {
     try { await navigator.share({ title, text, url }); return "shared"; }

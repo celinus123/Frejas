@@ -91,6 +91,21 @@ After changing native settings or adding a plugin: `npx cap sync`.
 
 `supabase/019_levels.sql`. Three levels: **guest** (no account), **free** (an account) and **plus** (paid). What each has room for is a row in `plan_limits`: habits of your own, challenges you started, and challenges others started that you are in. Guest and free start at 5, 1 and 2; plus has no limits. To change a number: `update plan_limits set habits = 7 where level = 'free';`. Habits that came with a challenge don't count, solo challenges and drafts do, and nothing anyone already has is taken away. The database refuses anything over the limit; the app asks `my_limits()` first and shows a notice instead of a form. To give someone the paid level by hand: `insert into user_plans (user_id, note) values ('<their id>', 'why');`.
 
+### Knowing how Frejas is used
+
+Two layers, both private to whoever is in the `admins` table (Settings → Looking after Frejas):
+
+- **Frejas's own numbers** (`supabase/020_insights.sql`, always on): the days the app is opened, how new people arrived, feedback, and questions to everyone. **Insights** shows people, returning, habits and challenges per person, invitations, and guests who saved their account. **Questions to everyone** asks one question as a pop-up and shows the answers. **Feedback** lists what people wrote under "Give feedback".
+- **Screens and taps** (PostHog, optional): which screens are opened and which named actions are done, only for people who say yes when the app asks. Never habit or challenge names, never anything written, no screen recordings, and ids are taken out of addresses (`lib/analytics.ts`). To switch it on, add `NEXT_PUBLIC_POSTHOG_KEY` (the project key from PostHog, EU cloud) in Vercel and redeploy. The privacy policy shows its PostHog section only when this key is set. In PostHog: accept the data processing agreement, turn on "Discard client IP data", and keep data for at most a year (the policy says so).
+
+### Robot check at sign-in
+
+Cloudflare Turnstile (`lib/captcha.ts`). Add `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (the widget's site key for `frejas.app`) in Vercel and redeploy; from then on every sign-in request carries a proof. **Only after that**, and after trying a sign-in in the iPhone app, switch on Authentication → Attack Protection → CAPTCHA protection in Supabase with the widget's secret key. Switched on in Supabase without the key in Vercel, nobody can sign in; switching it off again in Supabase undoes that at once.
+
+### Public testers (TestFlight)
+
+In App Store Connect → TestFlight: fill in Test Information, create an external group named `Public testers`, add a build and submit it for beta review, then enable the group's public link. After that, the Codemagic workflow "iOS → TestFlight, public testers" sends each new build to that group.
+
 ### Notifications
 
 - From other people (invitation, request to join, comment, new friend): the app calls `/api/notify`, which looks the event up in

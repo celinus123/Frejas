@@ -12,6 +12,7 @@ import { habitViewers, loadHabits, myFriends, pairHabits, setHabitViewers, unpai
 import { bestMatch } from "@/lib/similar";
 import { ReminderField } from "./ReminderField";
 import { enablePush, hhmm } from "@/lib/push";
+import { track } from "@/lib/analytics";
 
 const FREQS: { v: Frequency; l: string }[] = [
   { v: "daily", l: "Daily" }, { v: "specific_days", l: "Specific days" }, { v: "times_per_week", l: "Times a week" },
@@ -115,6 +116,7 @@ export function HabitForm({ habit }: { habit?: Habit }) {
     }
     const { data, error } = await supabase().from("habits").insert({ ...row, owner_id: userId }).select("id").single();
     if (error) { setBusy(false); return setErr(error.message); }
+    track("habit_created", { frequency: String(row.frequency ?? ""), reminder: !!row.reminder_time, shared: row.visibility !== "private" || seenBy.length > 0 });
     if (seenBy.length) await setHabitViewers(data.id, seenBy).catch(() => toast({ text: "The habit is saved as private: the list of friends couldn't be stored. Open it and try again." }));
     if (fill && backDays.length) {
       const { error: le } = await supabase().from("habit_logs").insert(backDays.map((d) => ({ habit_id: data.id, user_id: userId, log_date: d, created_at: new Date(`${d}T12:00:00`).toISOString() })));

@@ -22,7 +22,7 @@ const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function Settings() {
   const router = useRouter();
-  const { guest, userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
+  const { shareUsage, setShareUsage, guest, userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
   const [saveOpen, setSaveOpen] = useState(false);       // a guest adding their email
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { limits } = useLimits(userId);                  // what this level has room for
@@ -227,6 +227,10 @@ export default function Settings() {
       <div className="card group">
         <div className="row"><Icon name="lock" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>New habits are private</div>
           <Switch on={profile.new_habits_private} onChange={(v) => update({ new_habits_private: v })} label="New habits are private" /></div>
+        {shareUsage !== undefined && (
+          <div className="row"><Icon name="stats" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Share how I use the app</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Screens and taps. Never names or what you write.</div></div>
+            <Switch on={shareUsage === true} onChange={(v) => setShareUsage(v)} label="Share how I use the app" /></div>
+        )}
         <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={exportData}>
           <Icon name="download" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Download my data</div></button>
         <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setBlocksOpen(true)}>

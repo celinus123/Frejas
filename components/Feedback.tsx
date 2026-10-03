@@ -5,6 +5,7 @@ import { Icon } from "./Icon";
 import { Sheet } from "./ui";
 import { useApp } from "./AppProvider";
 import { sendFeedback } from "@/lib/usage";
+import { track } from "@/lib/analytics";
 
 /** "Give feedback": a few lines straight to whoever runs Frejas. */
 export function FeedbackSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -21,6 +22,7 @@ export function FeedbackSheet({ open, onClose }: { open: boolean; onClose: () =>
     setBusy(true); setErr(null);
     try {
       await sendFeedback(userId, body, path);
+      track("feedback_sent");
       setBody(""); onClose();
       toast({ text: <><b>Thank you.</b> We read everything that comes in.</> });
     } catch (e) { setErr((e as Error).message); setBusy(false); }

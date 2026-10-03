@@ -8,6 +8,7 @@ import { FrejasLockup } from "@/components/Logo";
 import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 import { useGuestStart } from "@/lib/guest";
+import { track } from "@/lib/analytics";
 
 export default function AddFriend({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
@@ -31,6 +32,7 @@ export default function AddFriend({ params }: { params: Promise<{ code: string }
       if (error) { setState("error"); setErr(error.message); return; }
       if (typeof data === "string") notify({ type: "friend", user_id: data });   // the one who shared the link hears about it
       setState("done");
+      track("friend_added", { via: "link" });
       toast({ text: <>You and <b>{name}</b> are now friends.</> });
       router.replace("/feed");
     });

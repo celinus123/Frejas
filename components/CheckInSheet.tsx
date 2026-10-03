@@ -8,6 +8,7 @@ import { uploadCheckinPhoto } from "@/lib/photos";
 import { celebrate } from "@/lib/native";
 import { Icon } from "./Icon";
 import { Sheet } from "./ui";
+import { track } from "@/lib/analytics";
 
 interface Props {
   open: boolean;
@@ -71,7 +72,7 @@ export function CheckInSheet({ open, onClose, onSaved, challenge, userId, habitI
         const { error } = await supabase().from("check_ins").insert({ ...fields, challenge_id: challenge.id, user_id: userId, habit_log_id: logId });
         if (error) throw error;
       }
-      if (!existing) celebrate();
+      if (!existing) { celebrate(); track("checkin_made", { photo: !!photo_path, note: !!comment.trim(), amount: needsAmount }); }
       onSaved();
       onClose();
     } catch (e) {

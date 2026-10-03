@@ -16,6 +16,7 @@ import { uploadCover } from "@/lib/photos";
 import { MAX_CHOICES, planWeeks, scheduleLabel } from "@/lib/scoring";
 import { STAKE_EMOJIS, STAKE_MAX, joinStake, stakeParts } from "@/lib/stake";
 import type { Challenge, CoverPreset, Habit } from "@/lib/types";
+import { track } from "@/lib/analytics";
 
 type Freq = "daily" | "specific_days" | "times_per_week";
 type Unit = string; // "" = just done; "min", "km", "steps", or a unit of your own ("pages", "reps")
@@ -208,6 +209,8 @@ function NewChallenge() {
         const { error: ie } = await supabase().from("challenge_invites").insert([...invitees].map((u) => ({ challenge_id: cid, user_id: u, invited_by: userId })));
         if (!ie) for (const u of invitees) notify({ type: "invite", challenge_id: cid, user_id: u });
       }
+      track("challenge_created", { solo, invited: solo ? 0 : invitees.size, stake: !solo && !!stake, findable: !solo && findable });
+      if (!solo && invitees.size) track("invite_sent", { count: invitees.size, at: "creation" });
       router.replace(`/challenges/${cid}${solo ? "" : "?created=1"}`);
     } catch (e) {
       setErr((e as Error).message); setBusy(false);

@@ -14,6 +14,7 @@ import { daysLeft, fmt, isFull, isV2, joinClosed, joinLeft, ordinal, placesLabel
 import { diffDays, formatShort, today } from "@/lib/dates";
 import { forgetInvite, savedInvites } from "@/lib/savedInvites";
 import type { Challenge } from "@/lib/types";
+import { track } from "@/lib/analytics";
 
 /** An invitation link you answered "Not now" to (remembered on this device). */
 type SavedLink = InvitePreview & { token: string };
@@ -93,6 +94,7 @@ export default function Challenges() {
     const { error } = await supabase().rpc("join_challenge", { p_token: inv.challenge.invite_token });
     setBusy(null);
     if (error) { toast({ text: error.message }); return; }
+    track("challenge_joined", { via: "invitation", asked: false, own_habit: false });
     router.push(`/challenges/${inv.challenge.id}`);
   }
 

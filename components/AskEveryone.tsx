@@ -4,6 +4,7 @@ import { Icon } from "./Icon";
 import { Sheet } from "./ui";
 import { useApp } from "./AppProvider";
 import { answerQuestion, nextQuestion, type Question } from "@/lib/usage";
+import { track } from "@/lib/analytics";
 
 const later = (id: string) => `frejas-q-later:${id}`;
 const DAY = 20 * 60 * 60 * 1000;   // "Not now" keeps a question away until roughly the next day
@@ -45,6 +46,7 @@ export function AskEveryone() {
     setBusy(true); setErr(null);
     try {
       await answerQuestion(userId!, q!, skipped ? { skipped: true } : q!.kind === "text" ? { body } : { choice: choice! });
+      track("question_answered", { skipped, kind: q!.kind });
       close();
       if (!skipped) toast({ text: <><b>Thank you.</b> That helps a lot.</> });
     } catch (e) { setErr((e as Error).message); setBusy(false); }

@@ -1,6 +1,8 @@
 "use client";
 import { syncStatusBar } from "@/lib/native";
 import { markSeen } from "@/lib/usage";
+import { analyticsConfigured, startAnalytics, stopAnalytics, track, trackScreen, cleanPath } from "@/lib/analytics";
+import { platformName } from "@/lib/native";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -14,6 +16,8 @@ interface Ctx {
   ready: boolean;                    // false until we know whether someone is signed in
   userId: string | null;
   guest: boolean;                    // using Frejas without an account (no email yet)
+  shareUsage: boolean | null | undefined;   // said yes or no to sharing how they use the app; null = not asked yet; undefined = not known yet, or not in use
+  setShareUsage: (yes: boolean) => Promise<void>;
   profile: Profile | null;
   refreshProfile: () => Promise<void>;
   setTheme: (t: Profile["theme"]) => void;
@@ -81,6 +85,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [uidNow, named]);
+  // Sharing how the app is used (lib/analytics.ts): only when it is set up, and only for someone who has said yes.
+  const [shareUsage, setShare] = useState<boolean | null | undefined>(undefined);
+  const guestNow = !!session?.user.is_anonymous;
+  useEffect(() => {
+    setShare(undefined);
+    if (!uidNow || !analyticsConfigured()) { stopAnalytics(); return; }
+    let off = false;
+    Promise.resolve(supabase().from("user_prefs").select("share_usage").eq("user_id", uidNow).maybeSingle()).then(({ data, error }) => {
+      if (off || error) return;
+      setShare((data as { share_usage: boolean | null } | null)?.share_usage ?? null);
+    }, () => {});
+    return () => { off = true; };
+  }, [uidNow]);
+  useEffect(() => {
+    if (!uidNow || shareUsage !== true) { if (shareUsage === false) stopAnalytics(); return; }
+    let off = false;
+    Promise.resolve(supabase().rpc("my_limits")).then(({ data }) => (data as { level?: string } | null)?.level, () => undefined)
+      .then((level) => startAnalytics(uidNow, { level, platform: platformName(), guest: guestNow }))
+      .then(() => { if (!off) trackScreen(window.location.pathname); });
+    return () => { off = true; };
+  }, [uidNow, shareUsage, guestNow]);
+  const setShareUsage = useCallback(async (yes: boolean) => {
+    if (!uidNow) return;
+    setShare(yes);
+    await supabase().from("user_prefs").upsert({ user_id: uidNow, share_usage: yes, asked_at: new Date().toISOString() });
+  }, [uidNow]);
+  // each screen that is opened, and the screen someone was on when they put the app away
+  useEffect(() => { trackScreen(path); }, [path]);
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "hidden") track("app_hidden", { screen: cleanPath(window.location.pathname) }); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
   // in the iPhone app: keep this phone known for notifications, and open the right page when one is tapped
   useEffect(() => { if (uidNow) startPush((url) => router.push(url)); }, [uidNow, router]);
   // asked when the app opens; whoever looks after reports is also asked each time the app comes back to the front
@@ -164,13 +201,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     session, ready,
     userId: session?.user.id ?? null,
     guest: !!session?.user.is_anonymous,
+    shareUsage, setShareUsage,
     profile,
     refreshProfile: async () => { if (session) await loadProfile(session.user.id); },
     setTheme: (t) => { applyTheme(t); setProfile((p) => (p ? { ...p, theme: t } : p)); },
     toast,
     unread, refreshUnread,
     reportsOpen, refreshReports,
-  }), [session, ready, profile, loadProfile, toast, unread, refreshUnread, reportsOpen, refreshReports]);
+  }), [session, ready, profile, loadProfile, toast, unread, refreshUnread, reportsOpen, refreshReports, shareUsage, setShareUsage]);
 
   const blocked = path !== "/" && !SITE.some((p) => path.startsWith(p)) && (!ready || (!session && !open(path)));
 

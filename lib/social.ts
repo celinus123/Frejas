@@ -3,6 +3,7 @@ import { supabase } from "./supabase";
 import type { Emoji } from "./design";
 import { emojiSupported } from "./data";
 import { notify } from "./push";
+import { track } from "./analytics";
 
 /** A post in the feed is either a check-in, or someone's shared habits for one day. */
 export type PostRef = { kind: "checkin"; id: string } | { kind: "day"; owner: string; day: string };
@@ -51,6 +52,7 @@ export async function react(ref: PostRef, uid: string, emoji: Emoji | null, had:
       : sb().from(table).insert(ref.kind === "checkin" && !emojiSupported() ? key : { ...key, emoji });
   const { error } = await q;
   if (error) throw error;
+  if (emoji !== null && !had) track("reaction_added", { on: ref.kind });
 }
 
 export async function addComment(ref: PostRef, uid: string, body: string): Promise<PostComment> {
@@ -61,6 +63,7 @@ export async function addComment(ref: PostRef, uid: string, body: string): Promi
   const { data, error } = await q.select("id, user_id, body, created_at").single();
   if (error) throw error;
   notify({ type: "comment", on: ref.kind === "checkin" ? "checkin" : "day", id: (data as PostComment).id });
+  track("comment_written", { on: ref.kind });
   return data as PostComment;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
+import { captchaToken, isCaptchaError, CAPTCHA_FAILED } from "./captcha";
 
 // Starting without an account. A guest is a real user on the server with no email: everything works the same,
 // but the only key to it is this phone or browser. Adding an email later turns the same user into an account.
@@ -32,10 +33,10 @@ export function useGuestStart() {
   useEffect(() => { guestAllowed().then(setOk); }, []);
   async function start() {
     setBusy(true); setErr(null);
-    const { error } = await supabase().auth.signInAnonymously();
+    const { error } = await supabase().auth.signInAnonymously({ options: { captchaToken: await captchaToken() } });
     if (!error) return;   // stays busy: the app is on its way to the name step
     setBusy(false);
-    setErr(error.status === 429 || /rate limit/i.test(error.message)
+    setErr(isCaptchaError(error) ? CAPTCHA_FAILED : error.status === 429 || /rate limit/i.test(error.message)
       ? "Too many people started from this network just now. Try again in a while, or continue with email."
       : "Couldn't start right now. Try again, or continue with email.");
   }

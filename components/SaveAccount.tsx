@@ -6,6 +6,8 @@ import { Sheet } from "./ui";
 import { useApp } from "./AppProvider";
 import { supabase } from "@/lib/supabase";
 import { forgetPush } from "@/lib/push";
+import { captchaToken, isCaptchaError, CAPTCHA_FAILED } from "@/lib/captcha";
+import { track } from "@/lib/analytics";
 
 /** For someone using Frejas without an account: add an email, confirm it with the code we send, and the same
  *  habits, challenges and friends now belong to an account that can be opened from any phone. */
@@ -31,6 +33,7 @@ export function SaveAccountSheet({ open, onClose }: { open: boolean; onClose: ()
   function finish() {
     if (done.current) return;
     done.current = true;
+    track("account_saved");
     onClose();
     toast({ text: <><b>Your account is saved.</b> Log in with {email.trim()} on any phone.</> });
   }
@@ -59,14 +62,15 @@ export function SaveAccountSheet({ open, onClose }: { open: boolean; onClose: ()
     if (error) {
       if (error.code === "email_exists" || /already (been )?registered|already exists/i.test(error.message)) return setStep("taken");
       const limited = error.status === 429 || /rate limit|only request this after/i.test(error.message);
-      return setErr(limited ? "Too many emails in a short time. Wait a little and try again." : error.message);
+      return setErr(isCaptchaError(error) ? CAPTCHA_FAILED : limited ? "Too many emails in a short time. Wait a little and try again." : error.message);
     }
     setStep("code"); setCode(""); setResendIn(45);
   }
 
   async function verify(value: string) {
     setBusy(true); setErr(null);
-    const { error } = await supabase().auth.verifyOtp({ email: email.trim(), token: value, type: "email_change" });
+    let { error } = await supabase().auth.verifyOtp({ email: email.trim(), token: value, type: "email_change" });
+    if (isCaptchaError(error)) ({ error } = await supabase().auth.verifyOtp({ email: email.trim(), token: value, type: "email_change", options: { captchaToken: await captchaToken() } }));
     setBusy(false);
     if (error) { setErr("That code didn't work. Check it, or send a new one."); setCode(""); return; }
     finish();

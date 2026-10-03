@@ -22,6 +22,7 @@ import { addComment, react, removeComment, summary, type Social } from "@/lib/so
 import { D, type Emoji } from "@/lib/design";
 import { signedUrls } from "@/lib/photos";
 import type { Challenge, CheckIn, Member, Message } from "@/lib/types";
+import { track } from "@/lib/analytics";
 
 type Tab = "Overview" | "Leaderboard" | "Stats" | "Chat";
 interface Req { user_id: string; goal_amount: number | null; times_per_week: number | null; profiles?: { display_name: string; avatar_path: string | null } | null }
@@ -872,7 +873,7 @@ function InviteSheet({ open, onClose, c, userId, members, onShareLink, beforeInv
   async function invite(uid: string) {
     await beforeInvite?.();
     const { error } = await supabase().from("challenge_invites").insert({ challenge_id: c.id, user_id: uid, invited_by: userId });
-    if (!error) { setSent((s) => new Set(s).add(uid)); toast({ text: "Invitation sent." }); notify({ type: "invite", challenge_id: c.id, user_id: uid }); }
+    if (!error) { setSent((s) => new Set(s).add(uid)); toast({ text: "Invitation sent." }); notify({ type: "invite", challenge_id: c.id, user_id: uid }); track("invite_sent", { count: 1, at: "challenge" }); }
   }
   return (
     <Sheet open={open} onClose={onClose} label="Invite friends">

@@ -2,6 +2,7 @@
 import { hasPlugin, isIOSApp as isNative } from "./native";
 import { supabase } from "./supabase";
 import type { Habit } from "./types";
+import { track } from "./analytics";
 
 /**
  * Notifications. Two kinds:
@@ -61,6 +62,7 @@ export async function enablePush(): Promise<PushState> {
     let s = (await P.checkPermissions()).receive;
     if (s === "prompt" || s === "prompt-with-rationale") s = (await P.requestPermissions()).receive;
     if (s === "granted") await P.register();
+    track("notifications_asked", { granted: s === "granted" });
     return asState(s);
   } catch { return "unavailable"; }
 }

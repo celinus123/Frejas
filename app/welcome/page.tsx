@@ -11,6 +11,7 @@ import { isNative } from "@/lib/native";
 import { StakeIcon, stakeText } from "@/components/Stake";
 import { useGuestStart } from "@/lib/guest";
 import { noteOrigin } from "@/lib/usage";
+import { captchaToken, isCaptchaError, CAPTCHA_FAILED } from "@/lib/captcha";
 
 // App Store and Google Play reviewers can't receive our email codes, so this one account signs in with a password.
 const REVIEW_EMAIL = "review@frejas.app";
@@ -80,18 +81,19 @@ function Welcome() {
 
   async function reviewSignIn() {
     setBusy(true); setErr(null);
-    const { error } = await supabase().auth.signInWithPassword({ email: email.trim(), password });
+    const { error } = await supabase().auth.signInWithPassword({ email: email.trim(), password, options: { captchaToken: await captchaToken() } });
     setBusy(false);
-    if (error) setErr("That password doesn't match.");
+    if (error) setErr(isCaptchaError(error) ? CAPTCHA_FAILED : "That password doesn't match.");
   }
 
   async function sendCode() {
     if (isReview) return reviewSignIn();
     setBusy(true); setErr(null);
     const back = `${window.location.origin}/welcome${invite ? `?invite=${invite}` : friend ? `?friend=${friend}` : ""}`;
-    const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: back } });
+    const { error } = await supabase().auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: true, emailRedirectTo: back, captchaToken: await captchaToken() } });
     setBusy(false);
     if (error) {
+      if (isCaptchaError(error)) return setErr(CAPTCHA_FAILED);
       const limited = error.status === 429 || /rate limit|only request this after/i.test(error.message);
       return setErr(limited ? "Too many emails in a short time. Wait a little and try again, or use the last email we sent you." : error.message);
     }
@@ -100,7 +102,9 @@ function Welcome() {
 
   async function verify(value: string) {
     setBusy(true); setErr(null);
-    const { error } = await supabase().auth.verifyOtp({ email: email.trim(), token: value, type: "email" });
+    let { error } = await supabase().auth.verifyOtp({ email: email.trim(), token: value, type: "email" });
+    // only if Supabase asks for the robot check here too: once more, with it
+    if (isCaptchaError(error)) ({ error } = await supabase().auth.verifyOtp({ email: email.trim(), token: value, type: "email", options: { captchaToken: await captchaToken() } }));
     setBusy(false);
     if (error) { setErr("That code didn't work. Check it, or send a new one."); setCode(""); }
     // On success the session listener loads the profile and the effect above moves on.

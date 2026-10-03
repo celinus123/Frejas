@@ -5,6 +5,7 @@ import { Nav, Sheet } from "./ui";
 import { Icon } from "./Icon";
 import { useApp } from "./AppProvider";
 import { AskEveryone } from "./AskEveryone";
+import { UsageConsent } from "./UsageConsent";
 import { isActive, myChallenges, type MyChallenge } from "@/lib/data";
 
 function Option({ icon, title, sub, onClick }: { icon: string; title: string; sub: string; onClick: () => void }) {
@@ -35,6 +36,7 @@ export function Shell({ children }: { children: ReactNode }) {
     <>
       {children}
       <Nav onPlus={() => setOpen(true)} />
+      <UsageConsent />
       <AskEveryone />
       <Sheet open={open} onClose={() => setOpen(false)} label="Add">
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

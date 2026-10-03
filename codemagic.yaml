@@ -1,7 +1,7 @@
 # Builds the Frejas apps in the cloud (no Mac needed) and uploads them to TestFlight and Google Play.
 # One-time setup in Codemagic is described in README.md under "App Store and Google Play".
 workflows:
-  ios-release:
+  ios-release: &ios
     name: iOS → TestFlight
     max_build_duration: 60
     instance_type: mac_mini_m2
@@ -36,6 +36,19 @@ workflows:
         # Internal testers get every uploaded build without a review. Turn this on (and fill in
         # Test Information in App Store Connect) only when inviting external testers.
         submit_to_testflight: false
+
+  # The same build, and then sent on to the people testing through the public TestFlight link.
+  # Needs, once, in App Store Connect → TestFlight: Test Information filled in, and an external group
+  # with exactly the name below. The first build to that group waits for Apple's beta review.
+  ios-public:
+    <<: *ios
+    name: iOS → TestFlight, public testers
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        beta_groups:
+          - Public testers
 
   android-release:
     name: Android → Google Play (internal testing)

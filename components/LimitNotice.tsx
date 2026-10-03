@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
+import { useEffect } from "react";
 import { Icon } from "./Icon";
 import { BackBar } from "./ui";
 import type { LimitKind } from "@/lib/limits";
+import { track } from "@/lib/analytics";
 
 const s = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
@@ -24,6 +26,7 @@ export function limitCopy(kind: LimitKind, max: number): { title: string; body: 
 
 export function LimitCard({ kind, max, children }: { kind: LimitKind; max: number; children?: React.ReactNode }) {
   const c = limitCopy(kind, max);
+  useEffect(() => { track("limit_seen", { kind, max }); }, [kind, max]);
   return (
     <section className="soft" role="status" style={{ padding: 20, borderRadius: 24, display: "flex", flexDirection: "column", gap: 10 }}>
       <Icon name={kind === "habits" ? "check" : "trophy"} size={26} color="var(--primary)" />
