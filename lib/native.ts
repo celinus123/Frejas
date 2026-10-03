@@ -15,6 +15,10 @@ export const isAppLike = () => typeof window !== "undefined" && (isNative()
   || window.matchMedia?.("(display-mode: standalone)").matches
   || (navigator as Navigator & { standalone?: boolean }).standalone === true);
 
+/** Where Frejas is running, in one word: the iPhone app, the Android app, saved to a home screen, or a browser. */
+export const platformName = (): "ios" | "android" | "home" | "web" =>
+  isNative() ? (Capacitor.getPlatform() === "ios" ? "ios" : "android") : isAppLike() ? "home" : "web";
+
 /** A light tap you can feel, e.g. when ticking a habit. Does nothing in a browser. */
 export async function tap() {
   if (!isNative()) return;

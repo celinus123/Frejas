@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
 import { GuestCard, SaveAccountSheet } from "@/components/SaveAccount";
 import { useLimits, type Room } from "@/lib/limits";
+import { FeedbackSheet } from "@/components/Feedback";
 import { Icon } from "@/components/Icon";
 import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
@@ -23,6 +24,7 @@ export default function Settings() {
   const router = useRouter();
   const { guest, userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
   const [saveOpen, setSaveOpen] = useState(false);       // a guest adding their email
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { limits } = useLimits(userId);                  // what this level has room for
   const [leaveOpen, setLeaveOpen] = useState(false);     // a guest about to log in to another account
   const [name, setName] = useState(profile?.display_name ?? "");
@@ -236,6 +238,9 @@ export default function Settings() {
           <div className="label">Looking after Frejas</div>
           <div className="card group">
             <Link href="/admin/reports" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="flag" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Reports</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>{reportsOpen ? `${reportsOpen} waiting · answer within 24 hours` : "Nothing is waiting"}</div></div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+            <Link href="/admin/insights" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="stats" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Insights</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>How Frejas is being used</div></div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+            <Link href="/admin/questions" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="comment" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Questions to everyone</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Ask, and read the answers</div></div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+            <Link href="/admin/feedback" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="mail" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Feedback</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>What people wrote to you</div></div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
           </div>
         </>
       )}
@@ -245,6 +250,7 @@ export default function Settings() {
         <Link href="/privacy" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="shield" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Privacy policy</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
         <Link href="/terms" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="edit" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Terms</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
         <Link href="/support" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="comment" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Help and questions</div><Icon name="right" size={16} color="var(--ink-2)" /></Link>
+        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setFeedbackOpen(true)}><Icon name="edit" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Give feedback</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Tell us what works and what doesn&apos;t</div></div><Icon name="right" size={16} color="var(--ink-2)" /></button>
         <a href="mailto:hello@frejas.app" className="row" style={{ color: "inherit", textDecoration: "none" }}><Icon name="mail" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Contact us</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>hello@frejas.app</div></div><Icon name="right" size={16} color="var(--ink-2)" /></a>
       </div>
 
@@ -268,6 +274,7 @@ export default function Settings() {
       <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1{process.env.NEXT_PUBLIC_BUILD_ID && process.env.NEXT_PUBLIC_BUILD_ID !== "dev" ? ` · ${process.env.NEXT_PUBLIC_BUILD_ID.slice(0, 7)}` : ""}</div>
 
       <SaveAccountSheet open={saveOpen} onClose={() => setSaveOpen(false)} />
+      <FeedbackSheet open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <Sheet open={leaveOpen} onClose={() => setLeaveOpen(false)} label="Log in to an account">
         <div className="h1" style={{ fontSize: 22 }}>Log in to an account?</div>
         <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>What you have made here without an account stays behind and can&apos;t be opened again. If you want to keep it, save it with your email instead.</p>

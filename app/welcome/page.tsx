@@ -10,6 +10,7 @@ import { FrejasLockup } from "@/components/Logo";
 import { isNative } from "@/lib/native";
 import { StakeIcon, stakeText } from "@/components/Stake";
 import { useGuestStart } from "@/lib/guest";
+import { noteOrigin } from "@/lib/usage";
 
 // App Store and Google Play reviewers can't receive our email codes, so this one account signs in with a password.
 const REVIEW_EMAIL = "review@frejas.app";
@@ -112,6 +113,7 @@ function Welcome() {
       const avatar_path = photo ? await uploadAvatar(photo, userId) : null;
       const { error } = await supabase().from("profiles").update({ display_name: name.trim(), ...(avatar_path ? { avatar_path } : {}) }).eq("id", userId);
       if (error) throw error;
+      noteOrigin(invite, friend);   // for Frejas's own numbers: on their own, or through someone's link
       await refreshProfile();
       router.replace(next);
     } catch (e) {

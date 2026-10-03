@@ -5,6 +5,7 @@ import { useApp } from "@/components/AppProvider";
 import { Flame, Icon } from "@/components/Icon";
 import { Avatar, BackBar } from "@/components/ui";
 import { GuestCard, SaveAccountSheet } from "@/components/SaveAccount";
+import { FeedbackSheet } from "@/components/Feedback";
 import { supabase } from "@/lib/supabase";
 import { loadHabits, myFriends } from "@/lib/data";
 import { addDays, today } from "@/lib/dates";
@@ -14,6 +15,7 @@ interface Person { id: string; display_name: string; avatar_path: string | null;
 export default function Profile() {
   const { userId, profile, unread, guest } = useApp();
   const [saveOpen, setSaveOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [habitCount, setHabitCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [people, setPeople] = useState<Person[]>([]);
@@ -56,6 +58,12 @@ export default function Profile() {
         <span style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Archived habits</span>
         <Icon name="right" size={16} color="var(--ink-2)" />
       </Link>
+      <button className="card row" style={{ border: 0, textAlign: "left", width: "100%" }} onClick={() => setFeedbackOpen(true)}>
+        <Icon name="edit" color="var(--primary)" />
+        <span style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Give feedback</span>
+        <Icon name="right" size={16} color="var(--ink-2)" />
+      </button>
+      <FeedbackSheet open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
       <div className="label">Friends</div>
       {people.length ? (
         <section className="card group">

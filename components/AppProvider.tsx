@@ -1,5 +1,6 @@
 "use client";
 import { syncStatusBar } from "@/lib/native";
+import { markSeen } from "@/lib/usage";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { Session } from "@supabase/supabase-js";
@@ -71,6 +72,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [refreshUnread]);
+  // for Frejas's own numbers: note the days the app is opened (the day only), once someone has a name
+  const named = !!profile?.display_name;
+  useEffect(() => {
+    if (!uidNow || !named) return;
+    markSeen();
+    const onVis = () => { if (document.visibilityState === "visible") markSeen(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [uidNow, named]);
   // in the iPhone app: keep this phone known for notifications, and open the right page when one is tapped
   useEffect(() => { if (uidNow) startPush((url) => router.push(url)); }, [uidNow, router]);
   // asked when the app opens; whoever looks after reports is also asked each time the app comes back to the front
