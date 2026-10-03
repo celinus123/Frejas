@@ -1,12 +1,13 @@
 /* The words of the privacy policy and the terms, in one place: shown inside the app and on the website. */
-export const LEGAL_UPDATED = "2 October 2026";
+export const LEGAL_UPDATED = "3 October 2026";
 
 export function PrivacyBody() {
   return (
     <>
       <p>Frejas is run by Gabriella Blanche, Nice, France, who is responsible for your personal data. Contact: <a href="mailto:gabriella@frejas.app">gabriella@frejas.app</a>.</p>
       <h2 className="h2">What we store</h2>
-      <p>Your email address (to sign you in), the name and optional photo you choose, the habits you create (with their category) and when you tick them off, and the challenges, check-ins, photos, likes and chat messages you add.</p>
+      <p>Your email address if you have added one (to sign you in), the name and optional photo you choose, the habits you create (with their category) and when you tick them off, and the challenges, check-ins, photos, likes and chat messages you add.</p>
+      <p>You can use Frejas without an account. We then store the same things, but no email address, and what you make can only be opened from the device you started on until you add your email in Settings.</p>
       <p>If you block someone, we store that so it keeps working. If you report something, we store the report, who sent it, and a copy of what was reported, so that we can act on it. The person who looks after Frejas reads what was reported, including a reported photo. The person you report or block is not told it was you.</p>
       <p>If you turn on notifications in the iPhone app, we store the address Apple gives your phone for Frejas, so that we can send them. Apple delivers the notification. The address is removed when you sign out. Reminders you set for a habit are kept on your phone.</p>
       <p>Photos are resized and stripped of hidden information such as GPS location before they are uploaded.</p>
@@ -18,7 +19,7 @@ export function PrivacyBody() {
       <h2 className="h2">Where the data is</h2>
       <p>Your data is stored in the EU (Ireland) with Supabase, which runs our database, sign-in and photo storage. Vercel hosts the app and Resend sends the sign-in emails. They are US companies and may process limited data, such as your email address and IP address, outside the EU. All three process data only on our behalf, under data processing agreements and the EU standard contractual clauses or the EU–US Data Privacy Framework.</p>
       <h2 className="h2">How long</h2>
-      <p>As long as you have an account. When you delete your account in Settings, your data is deleted right away and disappears from backups within 30 days.</p>
+      <p>As long as you use Frejas, with or without an account. When you delete your account (or, without an account, everything) in Settings, your data is deleted right away and disappears from backups within 30 days.</p>
       <h2 className="h2">Your rights</h2>
       <p>You can download your data and delete your account in Settings at any time. You can also ask us to correct or delete data, and complain to the French data protection authority, the CNIL (cnil.fr).</p>
       <p>Frejas is for people aged 13 and over.</p>

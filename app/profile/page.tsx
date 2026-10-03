@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useApp } from "@/components/AppProvider";
 import { Flame, Icon } from "@/components/Icon";
 import { Avatar, BackBar } from "@/components/ui";
+import { GuestCard, SaveAccountSheet } from "@/components/SaveAccount";
 import { supabase } from "@/lib/supabase";
 import { loadHabits, myFriends } from "@/lib/data";
 import { addDays, today } from "@/lib/dates";
@@ -11,7 +12,8 @@ import { addDays, today } from "@/lib/dates";
 interface Person { id: string; display_name: string; avatar_path: string | null; shared: number }
 
 export default function Profile() {
-  const { userId, profile, unread } = useApp();
+  const { userId, profile, unread, guest } = useApp();
+  const [saveOpen, setSaveOpen] = useState(false);
   const [habitCount, setHabitCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [people, setPeople] = useState<Person[]>([]);
@@ -41,6 +43,8 @@ export default function Profile() {
       <section className="card" style={{ display: "flex", padding: "14px 8px" }}>
         {stat(habitCount, "habits")}{stat(<><Flame size={18} />{streak}</>, "day streak")}{stat(people.length, "friends")}
       </section>
+      {guest && <GuestCard onSave={() => setSaveOpen(true)} />}
+      <SaveAccountSheet open={saveOpen} onClose={() => setSaveOpen(false)} />
       <Link href="/notifications" className="card row" style={{ color: "inherit", textDecoration: "none" }}>
         <Icon name="bell" color="var(--primary)" />
         <span style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Notifications</span>

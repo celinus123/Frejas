@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useApp } from "@/components/AppProvider";
+import { GuestCard, SaveAccountSheet } from "@/components/SaveAccount";
 import { Icon } from "@/components/Icon";
 import { Avatar, BackBar, Sheet, Switch } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
@@ -19,7 +20,9 @@ const DAY = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export default function Settings() {
   const router = useRouter();
-  const { userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
+  const { guest, userId, session, profile, refreshProfile, setTheme, toast, reportsOpen } = useApp();
+  const [saveOpen, setSaveOpen] = useState(false);       // a guest adding their email
+  const [leaveOpen, setLeaveOpen] = useState(false);     // a guest about to log in to another account
   const [name, setName] = useState(profile?.display_name ?? "");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [typed, setTyped] = useState("");
@@ -80,6 +83,7 @@ export default function Settings() {
   useEffect(() => { pushState().then((s) => { setPush(s); if (s === "granted") pushDetails().then(setPhone); }); }, []);
   if (!profile || !userId || !session) return null;
   const email = session.user.email ?? "";
+  const confirmWord = guest ? "DELETE" : email;   // what has to be typed before everything is deleted
 
   async function update(fields: Partial<Profile>): Promise<boolean> {
     const { error } = await supabase().from("profiles").update(fields).eq("id", userId!);
@@ -147,9 +151,10 @@ export default function Settings() {
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => e.target.files?.[0] && photo(e.target.files[0])} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <label className="field" style={{ minHeight: 46 }}><input maxLength={40} value={name} onChange={(e) => setName(e.target.value)} onBlur={saveName} aria-label="Name" /></label>
-          <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "6px 4px 0", overflow: "hidden", textOverflow: "ellipsis" }}>{email}</div>
+          <div className="muted" style={{ fontSize: "var(--t-sub)", padding: "6px 4px 0", overflow: "hidden", textOverflow: "ellipsis" }}>{guest ? "No account yet" : email}</div>
         </div>
       </div>
+      {guest && <GuestCard onSave={() => setSaveOpen(true)} />}
 
       <div className="label">Appearance</div>
       <div className="card group"><div className="row"><Icon name="moon" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Theme</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Auto follows your phone</div></div>{seg}</div></div>
@@ -226,8 +231,10 @@ export default function Settings() {
       </div>
 
       <div className="card group" style={{ marginTop: 8 }}>
-        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={logout}><Icon name="logout" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Log out</div></button>
-        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setConfirmDelete((v) => !v)}><Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Delete account</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Permanently removes your data</div></div></button>
+        {guest
+          ? <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setLeaveOpen(true)}><Icon name="logout" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>Log in to an account</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>If you already have one</div></div></button>
+          : <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={logout}><Icon name="logout" color="var(--primary)" /><div style={{ flex: 1, fontSize: "var(--t-title)", fontWeight: 700 }}>Log out</div></button>}
+        <button className="row" style={{ width: "100%", border: 0, background: "none", textAlign: "left" }} onClick={() => setConfirmDelete((v) => !v)}><Icon name="trash" color="var(--primary)" /><div style={{ flex: 1 }}><div style={{ fontSize: "var(--t-title)", fontWeight: 700 }}>{guest ? "Delete everything" : "Delete account"}</div><div className="muted" style={{ fontSize: "var(--t-sub)" }}>Permanently removes your data</div></div></button>
       </div>
 
       {confirmDelete && (
@@ -235,13 +242,20 @@ export default function Settings() {
           <div className="h1" style={{ fontSize: 22 }}>We&apos;ll delete everything</div>
           <div className="muted" style={{ fontSize: 14, lineHeight: 1.5 }}>Your habits, history, check-ins, photos and profile are removed right away. Challenges you&apos;re in keep going for the others. This can&apos;t be undone.</div>
           <button className="btn btn-white" onClick={exportData}><Icon name="download" />Download my data first</button>
-          <div className="label">Type your email to confirm</div>
-          <label className="field"><input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={email} aria-label="Type your email to confirm" autoCapitalize="none" /></label>
-          <button className="btn" style={{ background: "var(--ink)", color: "var(--bg)" }} disabled={busy || typed.trim().toLowerCase() !== email.toLowerCase()} onClick={deleteAccount}>{busy ? "Deleting…" : "Delete my account"}</button>
+          <div className="label">{guest ? "Type DELETE to confirm" : "Type your email to confirm"}</div>
+          <label className="field"><input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={confirmWord} aria-label={guest ? "Type DELETE to confirm" : "Type your email to confirm"} autoCapitalize="none" /></label>
+          <button className="btn" style={{ background: "var(--ink)", color: "var(--bg)" }} disabled={busy || !confirmWord || typed.trim().toLowerCase() !== confirmWord.toLowerCase()} onClick={deleteAccount}>{busy ? "Deleting…" : guest ? "Delete everything" : "Delete my account"}</button>
         </section>
       )}
       <div className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", marginTop: 10 }}>Frejas · version 0.1{process.env.NEXT_PUBLIC_BUILD_ID && process.env.NEXT_PUBLIC_BUILD_ID !== "dev" ? ` · ${process.env.NEXT_PUBLIC_BUILD_ID.slice(0, 7)}` : ""}</div>
 
+      <SaveAccountSheet open={saveOpen} onClose={() => setSaveOpen(false)} />
+      <Sheet open={leaveOpen} onClose={() => setLeaveOpen(false)} label="Log in to an account">
+        <div className="h1" style={{ fontSize: 22 }}>Log in to an account?</div>
+        <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>What you have made here without an account stays behind and can&apos;t be opened again. If you want to keep it, save it with your email instead.</p>
+        <button className="btn btn-primary" onClick={() => { setLeaveOpen(false); setSaveOpen(true); }}>Save this with my email</button>
+        <button className="btn btn-soft" onClick={logout}>Leave this and log in</button>
+      </Sheet>
       <Sheet open={!!editRem} onClose={() => setEditRem(null)} label="Change the reminder">
         {editRem && (
           <>

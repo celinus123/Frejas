@@ -12,6 +12,7 @@ interface Ctx {
   session: Session | null;
   ready: boolean;                    // false until we know whether someone is signed in
   userId: string | null;
+  guest: boolean;                    // using Frejas without an account (no email yet)
   profile: Profile | null;
   refreshProfile: () => Promise<void>;
   setTheme: (t: Profile["theme"]) => void;
@@ -152,6 +153,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<Ctx>(() => ({
     session, ready,
     userId: session?.user.id ?? null,
+    guest: !!session?.user.is_anonymous,
     profile,
     refreshProfile: async () => { if (session) await loadProfile(session.user.id); },
     setTheme: (t) => { applyTheme(t); setProfile((p) => (p ? { ...p, theme: t } : p)); },

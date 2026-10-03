@@ -11,6 +11,7 @@ import { MembersIn } from "@/components/MembersIn";
 import { forgetInvite, saveInvite } from "@/lib/savedInvites";
 import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
+import { useGuestStart } from "@/lib/guest";
 import { formatShort, today } from "@/lib/dates";
 import { invitePreview, loadHabits, type InvitePreview } from "@/lib/data";
 import { bestMatch } from "@/lib/similar";
@@ -23,6 +24,7 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
   const { token } = use(params);
   const router = useRouter();
   const { session, userId, profile } = useApp();
+  const guest = useGuestStart();
   const [inv, setInv] = useState<Invite | null | undefined>(undefined);
   const [habits, setHabits] = useState<Habit[]>([]);
   const [habitId, setHabitId] = useState("new");
@@ -163,8 +165,12 @@ export default function Join({ params }: { params: Promise<{ token: string }> })
       ) : !session ? (
         <>
           <div style={{ flex: 1 }} />
-          <Link href={`/welcome?invite=${token}`} className="btn btn-primary">Create account to join</Link>
+          {guest.err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700, textAlign: "center" }}>{guest.err}</div>}
+          {guest.ok
+            ? <button className="btn btn-primary" disabled={guest.busy} onClick={guest.start}>{guest.busy ? "Starting…" : "Join the challenge"}</button>
+            : <Link href={`/welcome?invite=${token}`} className="btn btn-primary">Create account to join</Link>}
           <Link href={`/welcome?invite=${token}`} className="btn btn-soft">I already have an account</Link>
+          {guest.ok && <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", lineHeight: 1.5, margin: 0 }}>No account needed to join. By continuing you agree to the <a href="/terms" style={{ color: "var(--ink)" }}>Terms</a> and <a href="/privacy" style={{ color: "var(--ink)" }}>Privacy Policy</a>.</p>}
         </>
       ) : !profile?.display_name ? null : (
         <>

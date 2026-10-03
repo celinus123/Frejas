@@ -9,6 +9,7 @@ import { uploadAvatar } from "@/lib/photos";
 import { FrejasLockup } from "@/components/Logo";
 import { isNative } from "@/lib/native";
 import { StakeIcon, stakeText } from "@/components/Stake";
+import { useGuestStart } from "@/lib/guest";
 
 // App Store and Google Play reviewers can't receive our email codes, so this one account signs in with a password.
 const REVIEW_EMAIL = "review@frejas.app";
@@ -32,6 +33,8 @@ function Welcome() {
   const [password, setPassword] = useState("");
   const [resendIn, setResendIn] = useState(0);
   const [inv, setInv] = useState<Invite | null>(null);
+  const guest = useGuestStart();   // can someone start without an account?
+  const guestOk = guest.ok;
   const fileRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
@@ -130,7 +133,7 @@ function Welcome() {
           <div className="muted" style={{ fontSize: 14 }}><b style={{ color: "var(--ink)" }}>{inv.member_names[0]}</b> invited you to</div>
           <div className="h1">{inv.name}</div>
           {inv.stake && <span className="tag tag-accent" style={{ display: "flex", gap: 4, alignItems: "center" }}><StakeIcon stake={inv.stake} size={14} />{stakeText(inv.stake)}</span>}
-          <div className="muted" style={{ fontSize: 14.5, marginTop: 6 }}>Create a free account to join. It takes less than a minute.</div>
+          <div className="muted" style={{ fontSize: 14.5, marginTop: 6 }}>{guestOk ? "Join in less than a minute. No account needed." : "Create a free account to join. It takes less than a minute."}</div>
         </div>
         </>
       ) : (
@@ -141,7 +144,16 @@ function Welcome() {
         </div>
       )}
       <div style={{ flex: 1 }} />
-      <button className="btn btn-primary" onClick={() => setStep("email")}><Icon name="mail" />Continue with email</button>
+      {(guest.err || err) && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700, textAlign: "center" }}>{guest.err || err}</div>}
+      {guestOk ? (
+        <>
+          <button className="btn btn-primary" disabled={guest.busy} onClick={guest.start}>{guest.busy ? "Starting…" : "Get started"}</button>
+          <button className="btn btn-white" disabled={guest.busy} onClick={() => { guest.clear(); setErr(null); setStep("email"); }}><Icon name="mail" />Continue with email</button>
+          <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", lineHeight: 1.5, margin: 0 }}>No account needed to get started. Add your email later to keep everything safe.</p>
+        </>
+      ) : (
+        <button className="btn btn-primary" onClick={() => setStep("email")}><Icon name="mail" />Continue with email</button>
+      )}
       <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", lineHeight: 1.5, margin: 0 }}>
         By continuing you agree to the <a href="/terms" style={{ color: "var(--ink)" }}>Terms</a> and <a href="/privacy" style={{ color: "var(--ink)" }}>Privacy Policy</a>.
       </p>

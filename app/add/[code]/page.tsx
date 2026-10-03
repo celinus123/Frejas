@@ -7,6 +7,7 @@ import { Icon } from "@/components/Icon";
 import { FrejasLockup } from "@/components/Logo";
 import { notify } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
+import { useGuestStart } from "@/lib/guest";
 
 export default function AddFriend({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
@@ -15,6 +16,7 @@ export default function AddFriend({ params }: { params: Promise<{ code: string }
   const [name, setName] = useState<string | null | undefined>(undefined);
   const [state, setState] = useState<"idle" | "adding" | "done" | "error">("idle");
   const [err, setErr] = useState<string | null>(null);
+  const guest = useGuestStart();
 
   useEffect(() => {
     supabase().rpc("friend_preview", { p_code: code }).then(({ data }) => setName((data as string | null) ?? null));
@@ -63,8 +65,12 @@ export default function AddFriend({ params }: { params: Promise<{ code: string }
         <p className="muted" style={{ margin: 0, fontSize: 14.5, lineHeight: 1.5 }}>Friends see each other&apos;s check-ins and the habits you choose to share. Private habits stay private.</p>
       </div>
       <div style={{ flex: 1 }} />
-      <Link href={`/welcome?friend=${code}`} className="btn btn-primary">Create account</Link>
+      {guest.err && <div role="alert" style={{ fontSize: 13.5, fontWeight: 700, textAlign: "center" }}>{guest.err}</div>}
+      {guest.ok
+        ? <button className="btn btn-primary" disabled={guest.busy} onClick={guest.start}>{guest.busy ? "Starting…" : "Get started"}</button>
+        : <Link href={`/welcome?friend=${code}`} className="btn btn-primary">Create account</Link>}
       <Link href={`/welcome?friend=${code}`} className="btn btn-soft">I already have an account</Link>
+      {guest.ok && <p className="muted" style={{ textAlign: "center", fontSize: "var(--t-sub)", lineHeight: 1.5, margin: 0 }}>No account needed to get started. By continuing you agree to the <a href="/terms" style={{ color: "var(--ink)" }}>Terms</a> and <a href="/privacy" style={{ color: "var(--ink)" }}>Privacy Policy</a>.</p>}
     </>,
   );
 }

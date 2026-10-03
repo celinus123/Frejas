@@ -6,7 +6,7 @@ Web app (installable on the phone's home screen) built with Next.js and Supabase
 
 ## What's in version 0.1
 
-- Sign in with a 6-digit email code (no passwords), pick a name and optional photo
+- Start with just a name, no account needed; add an email later to keep everything (or sign in with a 6-digit email code from the start, no passwords)
 - Habits: daily, specific days, times a week, every other week, monthly; private or visible to friends
 - Today: week strip, one-tap check-off, flexible habits under "This week"
 - Stats: week, month and year, tap a day to fill it in
@@ -35,6 +35,8 @@ In the Supabase dashboard → **SQL Editor** → **New query**, run these files 
 
 - Subject: `Your Frejas code: {{ .Token }}`
 - Body: `<p>Your sign-in code is <strong>{{ .Token }}</strong>. It expires in 10 minutes.</p>`
+
+**Starting without an account** (optional). Turn on **Authentication → Sign In / Providers → Allow anonymous sign-ins** and, on the same page, **Allow manual linking**. The first screen then offers "Get started" with only a name, and invitation and friend links work without an email. The app asks the sign-in service whether this is on, so the buttons appear when the switch is flipped and not before. A guest is an ordinary user with no email; "Save my account" in Settings adds one. For that email, paste `supabase/emails/save-account.html` into **Authentication → Emails → Change Email Address** with the subject `Your Frejas code: {{ .Token }}`. Supabase limits new guests to 30 an hour per network; add a CAPTCHA (Authentication → Attack Protection) before the app is public.
 
 Before inviting friends, add your own email sender under **Authentication → Emails → SMTP Settings** (for example Resend). The built-in sender is only for testing.
 

@@ -218,7 +218,7 @@ html.onb-page .statusbar-cover { background: #b01e57; }
 .onb { --ink: #fff7e6; --ink-2: #ffe3ea; --primary: #4a1230; --on-primary: #ffffff; --primary-l: #e9a9c0; --surface: #ffffff; --soft: #fedfe2; --soft-l: #feeff0; --accent: #b01e57; --accent-bg: #fff7e6;
   --shadow: 0 0 0 1px rgba(46, 11, 25, 0.1), 0 2px 8px rgba(46, 11, 25, 0.16); --onb-link: #ffffff; color: var(--ink); }
 /* white and pink surfaces on the raspberry page keep dark text */
-.onb .field, .onb .icon-btn, .onb .soft, .onb .tag { --ink: #2e0b19; --ink-2: #75606a; color: #2e0b19; }
+.onb .field, .onb .icon-btn, .onb .soft, .onb .tag, .onb .btn-white { --ink: #2e0b19; --ink-2: #75606a; color: #2e0b19; }
 .onb .field:focus-within { box-shadow: inset 0 0 0 2.5px #4a1230; }
 .onb button:focus-visible, .onb a:focus-visible, .onb input:focus-visible { outline-color: #ffffff; }
 .onb .btn:disabled { opacity: .75; }
