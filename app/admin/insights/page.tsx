@@ -22,7 +22,7 @@ interface Stats {
   guests: { started: number; saved: number };
   notifications: { phones: number };
   usage: { yes: number; no: number };
-  inbox: { feedback_open: number; questions_open: number };
+  inbox: { feedback_open: number; questions_open: number; left_out?: number };
 }
 
 const pct = (n: number, of: number) => (of > 0 ? `${Math.round((n / of) * 100)}%` : "–");
@@ -153,7 +153,7 @@ export default function Insights() {
     <main className="page" style={{ gap: 12, paddingBottom: 60 }}>
       <BackBar title="Insights" right={<button className="icon-btn" aria-label="Refresh" disabled={busy} onClick={load}><Icon name="repeat" /></button>} />
       <div className="muted" style={{ fontSize: "var(--t-sub)", lineHeight: 1.45, padding: "0 4px" }}>
-        As of {new Date(s.as_of).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Your own account is left out. With few people, one person moves a percentage a lot, so the counts are always shown too.
+        As of {new Date(s.as_of).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}. Your own account{s.inbox.left_out ? ` and your ${s.inbox.left_out === 1 ? "test account" : `${s.inbox.left_out} test accounts`}` : ""} {s.inbox.left_out ? "are" : "is"} left out. With few people, one person moves a percentage a lot, so the counts are always shown too.
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>

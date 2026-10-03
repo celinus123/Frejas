@@ -96,6 +96,7 @@ After changing native settings or adding a plugin: `npx cap sync`.
 Two layers, both private to whoever is in the `admins` table (Settings → Looking after Frejas):
 
 - **Frejas's own numbers** (`supabase/020_insights.sql`, always on): the days the app is opened, how new people arrived, feedback, and questions to everyone. **Insights** shows people, returning, habits and challenges per person, invitations, and guests who saved their account. **Questions to everyone** asks one question as a pop-up and shows the answers. **Feedback** lists what people wrote under "Give feedback".
+  Accounts in `admins` are never counted, and neither are your own test accounts once they are listed: `insert into stats_excluded (user_id, note) values ('<id>', 'my test account');` (`supabase/021_stats_excluded.sql`).
 - **Screens and taps** (PostHog, optional): which screens are opened and which named actions are done, only for people who say yes when the app asks. Never habit or challenge names, never anything written, no screen recordings, and ids are taken out of addresses (`lib/analytics.ts`). To switch it on, add `NEXT_PUBLIC_POSTHOG_KEY` (the project key from PostHog, EU cloud) in Vercel and redeploy. The privacy policy shows its PostHog section only when this key is set. In PostHog: accept the data processing agreement, turn on "Discard client IP data", and keep data for at most a year (the policy says so).
 
 ### Robot check at sign-in
